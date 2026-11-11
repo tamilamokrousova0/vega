@@ -1,0 +1,117 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #050607; color: #d8d5cc;
+  font-family: "DIN Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  -webkit-user-select: none; user-select: none; touch-action: none; }
+canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+
+#vignette { position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 55%, rgba(0,0,0,.5) 100%); }
+#hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at 50% 50%, rgba(120,0,0,0) 40%, rgba(140,8,8,.85) 100%); }
+
+/* HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud .top { display: flex; gap: 2px; padding: 10px 12px; align-items: stretch; }
+.cell { background: rgba(10,12,14,.72); border-top: 2px solid #5d6a4c; padding: 6px 12px 7px; min-width: 96px; }
+.cell.wide { flex: 1; max-width: 340px; }
+.cell label { display: block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #8d927f; margin-bottom: 3px; white-space: nowrap; }
+.cell b { font-size: 21px; font-weight: 600; letter-spacing: .04em; color: #ece8dc; white-space: nowrap; }
+.bar { height: 8px; background: #1b1e20; margin-top: 7px; position: relative; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #9aa37c; transition: width .15s linear; }
+.bar.armor i { background: #b9b2a0; }
+.bar.armor.low i { background: #b33a2c; }
+
+#bossBar { position: absolute; left: 50%; top: 78px; transform: translateX(-50%); width: min(560px, 86vw); text-align: center; }
+#bossBar span { font-size: 20px; letter-spacing: .32em; color: #e3d9d0; text-shadow: 0 1px 6px #000; }
+#bossBar .bar { height: 12px; background: rgba(20,8,8,.85); border: 1px solid #4a1d1a; margin-top: 4px; }
+#bossBar .bar i { background: #9c2118; }
+#bossBar em { display: block; margin-top: 4px; font-style: normal; font-size: 13px; letter-spacing: .14em; color: #e0a25a; min-height: 16px; text-transform: uppercase; }
+
+#mods { position: absolute; left: 12px; top: 78px; font-size: 14px; letter-spacing: .08em; color: #aeb39f; line-height: 1.5; text-shadow: 0 1px 3px #000; text-transform: uppercase; }
+#airBtn { position: absolute; right: 14px; bottom: 18px; pointer-events: auto; }
+#squadTag { position: absolute; transform: translate(-50%, -100%); font-size: 20px; font-weight: 600; color: #ece8dc;
+  background: rgba(10,12,14,.7); padding: 1px 9px; border-left: 2px solid #9aa37c; text-shadow: 0 1px 2px #000; }
+
+#toasts { position: fixed; left: 0; right: 0; top: 30%; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.toast { font-size: 30px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #ece8dc; text-shadow: 0 2px 10px #000, 0 0 2px #000;
+  animation: toast 1.5s ease-out forwards; }
+.toast.good { color: #a9c7e6; }
+.toast.bad { color: #d86a5a; }
+.toast.big { font-size: 52px; letter-spacing: .3em; color: #e8ddd2; animation-duration: 2.6s; }
+@keyframes toast { 0% { opacity: 0; transform: translateY(14px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
+
+/* Screens */
+.screen { position: fixed; inset: 0; display: flex; align-items: center; background: rgba(4,5,6,.35); }
+.screen .panel { background: rgba(9,11,12,.86); border-left: 3px solid #5d6a4c; padding: 34px 38px; width: min(440px, 92vw); max-height: 94vh; overflow-y: auto; }
+.screen .panel.left { margin-left: 6vw; }
+.screen .panel.center { margin: 0 auto; width: min(620px, 94vw); }
+#arsenal, #result, #pause { background: rgba(4,5,6,.7); }
+h1 { font-size: 68px; line-height: .95; letter-spacing: .08em; color: #ece8dc; font-weight: 700; }
+h2 { font-size: 38px; letter-spacing: .12em; text-transform: uppercase; color: #ece8dc; font-weight: 700; }
+.sub { margin: 10px 0 22px; font-size: 18px; color: #9a9c8e; letter-spacing: .03em; line-height: 1.35; }
+.sub b { color: #ece8dc; }
+button { font: inherit; font-size: 19px; letter-spacing: .16em; text-transform: uppercase; color: #d8d5cc; background: rgba(40,44,40,.9);
+  border: 1px solid #4b5345; padding: 11px 20px; cursor: pointer; display: block; width: 100%; margin-top: 8px; text-align: left; }
+button:hover { background: #3a4136; border-color: #7d8a66; }
+button.primary { background: #5d6a4c; border-color: #7d8a66; color: #f2efe6; }
+button.primary:hover { background: #6f7e5a; }
+button:disabled { opacity: .4; cursor: default; }
+#airBtn { width: auto; background: rgba(120,40,24,.9); border-color: #b8553a; }
+#muteBtn { position: fixed; right: 12px; top: 12px; width: auto; margin: 0; font-size: 13px; padding: 6px 10px; opacity: .7; z-index: 5; }
+.help { list-style: none; margin-top: 24px; font-size: 16px; color: #84877a; line-height: 1.6; letter-spacing: .03em; }
+.help li::before { content: "— "; color: #5d6a4c; }
+
+#arsList { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+.item { background: rgba(26,29,28,.9); border: 1px solid #2f352d; padding: 10px 12px; }
+.item.locked { opacity: .45; }
+.item h3 { font-size: 19px; letter-spacing: .08em; text-transform: uppercase; color: #ece8dc; font-weight: 600; display: flex; justify-content: space-between; }
+.item h3 span { color: #9aa37c; font-size: 15px; }
+.item p { font-size: 15px; color: #94978a; margin: 4px 0 8px; line-height: 1.3; min-height: 38px; }
+.item button { font-size: 15px; padding: 6px 10px; margin: 0; }
+#resStats { font-size: 19px; line-height: 1.7; color: #b9b6aa; margin-bottom: 14px; letter-spacing: .04em; }
+#resStats b { color: #ece8dc; float: right; }
+
+@media (max-width: 640px) {
+  .cell { min-width: 0; padding: 5px 7px; flex: 1; }
+  .cell.wide { display: none; }
+  .cell b { font-size: 16px; }
+  .cell label { font-size: 10px; }
+  h1 { font-size: 48px; }
+  #arsList { grid-template-columns: 1fr; }
+  .screen .panel.left { margin: auto auto 3vh; }
+  .screen { align-items: flex-end; }
+  #arsenal, #result, #pause { align-items: center; }
+  .help { display: none; }
+  #muteBtn { top: 60px; }
+}
+
+/* --- VEGA: забег --- */
+h1 small { display: block; font-size: 26px; letter-spacing: .34em; color: #9aa37c; font-weight: 600; margin-top: 6px; }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+#rest { background: rgba(4,5,6,.72); }
+#restList { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#restList button { text-align: left; padding: 14px 14px 16px; margin: 0; height: 100%; letter-spacing: .1em; }
+#restList button b { display: block; font-size: 22px; color: #f2efe6; margin-bottom: 6px; }
+#restList button span { display: block; font-size: 15px; letter-spacing: .03em; text-transform: none; color: #a9ab9c; line-height: 1.3; }
+#actions { position: absolute; right: 14px; bottom: 16px; display: flex; gap: 6px; pointer-events: auto; }
+#actions button { position: relative; width: 104px; margin: 0; padding: 9px 10px 12px; text-align: left; font-size: 16px; background: rgba(20,23,22,.82); overflow: hidden; }
+#actions button small { display: block; font-size: 11px; letter-spacing: .14em; color: #7d8272; }
+#actions button i { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: #9aa37c; }
+#actions button.ready { border-color: #c9b25a; color: #f2e9c0; }
+#actions button.ready i { background: #c9b25a; }
+#actions button.held { background: #2f4a66; border-color: #4fa8ff; }
+.board { margin: 14px 0 6px; font-size: 16px; color: #94978a; letter-spacing: .04em; }
+.board h4 { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: #7d8272; font-weight: 600; margin-bottom: 4px; }
+.board div { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #23272a; }
+.board div.me { color: #f2e9c0; }
+.board div b { color: #d8d5cc; font-weight: 600; }
+@media (max-width: 640px) {
+  #restList { grid-template-columns: 1fr; }
+  #actions { left: 10px; right: 10px; bottom: 10px; justify-content: space-between; }
+  #actions button { width: 31%; }
+  #actions button small { display: none; }
+  h1 small { font-size: 18px; }
+}
+
+.toast.radio { font-size: 19px; letter-spacing: .05em; text-transform: none; color: #b9c2a8; max-width: 80vw; text-align: center; animation-duration: 5s; }

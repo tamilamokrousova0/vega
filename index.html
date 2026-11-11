@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>VEGA: Линия огня</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vignette"></div>
+<div id="hurt"></div>
+<div id="fade"></div>
+
+<div id="hud" class="hidden">
+  <div class="top">
+    <div class="cell wide">
+      <label id="lvlName">—</label>
+      <div class="bar"><i id="prog"></i></div>
+    </div>
+    <div class="cell"><label>Очки</label><b id="score">0</b></div>
+    <div class="cell"><label>Комбо</label><b id="combo">×1</b></div>
+    <div class="cell"><label>Отряд</label><b id="squadN">1</b></div>
+    <div class="cell"><label>Оружие</label><b id="wName">АК-47</b></div>
+    <div class="cell"><label>Броня</label><div class="bar armor"><i id="armor"></i></div></div>
+  </div>
+  <div id="bossBar" class="hidden">
+    <span id="bossName"></span>
+    <div class="bar"><i id="bossHp"></i></div>
+    <em id="bossNote"></em>
+  </div>
+  <div id="mods"></div>
+  <div id="actions">
+    <button id="btnRoll"><span>Перекат</span><small>пробел</small><i id="rollCd"></i></button>
+    <button id="btnDef"><span>Щит</span><small>shift</small></button>
+    <button id="btnUlt"><span id="ultName">Ульта</span><small>Q</small><i id="ultBar"></i></button>
+  </div>
+  <div id="squadTag"></div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="menu" class="screen">
+  <div class="panel left">
+    <h1>VEGA<small>Линия огня</small></h1>
+    <p class="sub">Капитан Вероника «Вега» Грай — последняя из отряда «Бастион». Город Арден пал за ночь. Собирайте выживших и прорывайтесь к источнику заражения.</p>
+    <p id="loadNote" class="sub hidden"></p>
+    <button id="btnStart" class="primary">Новый забег</button>
+    <button id="btnContinue" class="hidden">Тренировка</button>
+    <button id="btnUltPick">Ульта: Авиаудар</button>
+    <button id="btnArsenal">Арсенал</button>
+    <div id="menuBoard" class="board"></div>
+    <ul class="help">
+      <li>Мышь, палец или A / D — движение, огонь автоматический</li>
+      <li>Пробел — перекат (неуязвимость), Shift — щит, Q — ульта</li>
+      <li>Красные зоны на земле — уходите; перекат в последний момент замедляет время</li>
+      <li>P — пауза, M — звук</li>
+    </ul>
+  </div>
+</div>
+
+<div id="arsenal" class="screen hidden">
+  <div class="panel center">
+    <h2>Арсенал</h2>
+    <p class="sub">Мастерская «Шурупа». Жетоны: <b id="arsTok">0</b></p>
+    <div id="arsList"></div>
+    <button id="arsBack" class="primary">Назад</button>
+  </div>
+</div>
+
+<div id="rest" class="screen hidden">
+  <div class="panel center">
+    <h2 id="restTitle">Привал</h2>
+    <p class="sub" id="restSub">Выберите одно улучшение на этот забег.</p>
+    <div id="restList"></div>
+  </div>
+</div>
+
+<div id="result" class="screen hidden">
+  <div class="panel center">
+    <h2 id="resTitle"></h2>
+    <p class="sub" id="resSub"></p>
+    <div id="resStats"></div>
+    <div id="resBoard" class="board"></div>
+    <button id="resRevive" class="hidden"></button>
+    <button id="resNext" class="primary">Новый забег</button>
+    <button id="resArsenal">Арсенал</button>
+    <button id="resMenu">В меню</button>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden"><div class="panel center"><h2>Пауза</h2><button id="btnResume" class="primary">Продолжить</button><button id="btnQuit">В меню</button></div></div>
+
+<button id="muteBtn">Звук: вкл</button>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
