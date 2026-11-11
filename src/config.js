@@ -1,7 +1,7 @@
 // Балансовые таблицы (по документу «VEGA: Линия огня»)
 export const ROAD_HALF = 5.2;
 export const SCROLL = 14;
-export const SQUAD_MAX = 60;
+export const SQUAD_MAX = 8;
 
 export const WEAPONS = [
   { id: 'ak',     name: 'АК-47',              kind: 'bullet', rate: 6,   dmg: 15, pellets: 1, spread: 0.012, sRate: 1.8, sDmg: 9 },
@@ -14,13 +14,13 @@ export const WEAPONS = [
 
 // cost — цена в бюджете угрозы (БУ)
 export const ENEMIES = {
-  walker:   { name: 'Шатун',    cost: 1,  hp: 30,   speed: 2.2, r: 0.45, dmg: 10, bites: 1, scale: 1.0,  steer: 1.4, group: [4, 8] },
-  runner:   { name: 'Бегун',    cost: 2,  hp: 20,   speed: 7.0, r: 0.42, dmg: 10, bites: 1, scale: 0.95, steer: 3.0, group: [2, 4] },
-  crawler:  { name: 'Паразит',  cost: 1,  hp: 14,   speed: 5.0, r: 0.42, dmg: 6,  bites: 1, scale: 1.0,  steer: 2.5, group: [5, 8] },
-  spitter:  { name: 'Плевака',  cost: 4,  hp: 60,   speed: 1.0, r: 0.5,  dmg: 10, bites: 1, scale: 1.1,  steer: 1.0, group: [1, 2] },
-  exploder: { name: 'Раздутый', cost: 4,  hp: 50,   speed: 3.5, r: 0.5,  dmg: 20, bites: 1, scale: 1.1,  steer: 2.0, group: [1, 2], explode: 2.8 },
-  fat:      { name: 'Таран',    cost: 8,  hp: 240,  speed: 1.4, r: 0.8,  dmg: 30, bites: 3, scale: 1.55, steer: 1.0, group: [1, 1] },
-  brute:    { name: 'Громила',  cost: 25, hp: 1500, speed: 1.3, r: 1.15, dmg: 40, bites: 8, scale: 2.3,  steer: 1.2, group: [1, 1], model: 'fat', elite: true },
+  walker:   { name: 'Шатун',    cost: 1,  hp: 24,   speed: 2.2, r: 0.45, dmg: 10, bites: 1, scale: 1.0,  steer: 1.4, group: [4, 8] },
+  runner:   { name: 'Бегун',    cost: 2,  hp: 16,   speed: 7.0, r: 0.42, dmg: 10, bites: 1, scale: 0.95, steer: 3.0, group: [2, 4] },
+  crawler:  { name: 'Паразит',  cost: 1,  hp: 11,   speed: 5.0, r: 0.42, dmg: 6,  bites: 1, scale: 1.0,  steer: 2.5, group: [5, 8] },
+  spitter:  { name: 'Плевака',  cost: 4,  hp: 48,   speed: 1.0, r: 0.5,  dmg: 10, bites: 1, scale: 1.1,  steer: 1.0, group: [1, 2] },
+  exploder: { name: 'Раздутый', cost: 4,  hp: 40,   speed: 3.5, r: 0.5,  dmg: 20, bites: 1, scale: 1.1,  steer: 2.0, group: [1, 2], explode: 2.8 },
+  fat:      { name: 'Таран',    cost: 8,  hp: 190,  speed: 1.4, r: 0.8,  dmg: 30, bites: 3, scale: 1.55, steer: 1.0, group: [1, 1] },
+  brute:    { name: 'Громила',  cost: 25, hp: 1500, speed: 1.3, r: 1.15, dmg: 22, bites: 6, scale: 2.3,  steer: 1.2, group: [1, 1], model: 'fat', elite: true },
   gold:     { name: 'Золотой зомби', cost: 300, hp: 500, speed: 0, r: 0.5, dmg: 0, bites: 1, scale: 1.05, steer: 0, group: [1, 1], flee: true },
 };
 
@@ -57,26 +57,28 @@ export const BOSSES = {
 
 // Типы сегментов (30 с). k — доля бюджета угрозы; heavy — «тяжёлый» сегмент
 export const SEGMENTS = {
-  avenue:    { name: 'Проспект',      verb: 'Огонь',       k: 1.0,  gate: 9,   wall: 12 },
+  avenue:    { name: 'Проспект',      verb: 'Огонь',       k: 1.0,  crate: 11, wall: 12 },
   narrow:    { name: 'Узкое место',   verb: 'Уклонение',   k: 0.8,  heavy: 1, sides: 5.5 },
   barricade: { name: 'Баррикада',     verb: 'Оборона',     k: 1.5,  heavy: 1, stop: 1, dur: 26 },
   ambush:    { name: 'Засада',        verb: 'Ближний бой', k: 1.0,  heavy: 1, close: 1 },
-  gates:     { name: 'Коридор ворот', verb: 'Выбор',       k: 0.35, gate: 5.5, wall: 7 },
-  rescue:    { name: 'Спасение',      verb: 'Риск',        k: 0.8,  cages: 6, gate: 14 },
+  gates:     { name: 'Склад',         verb: 'Трофеи',      k: 0.5,  crate: 4,  wall: 8 },
+  rescue:    { name: 'Спасение',      verb: 'Риск',        k: 0.8,  cages: 3, crate: 15 },
   panic:     { name: 'Паника',        verb: 'Всё сразу',   k: 1.2,  heavy: 1, force: 'runner' },
-  supply:    { name: 'Снабжение',     verb: 'Передышка',   k: 0.25, supply: 1, gate: 10 },
+  supply:    { name: 'Снабжение',     verb: 'Передышка',   k: 0.25, supply: 1, crate: 8 },
 };
 export const SEG_DUR = 30;
 
 // Улучшения на привале (на один забег)
 export const UPGRADES = [
-  { id: 'men',    name: 'Подкрепление',  desc: '+6 бойцов в строй.' },
+  { id: 'men',    name: 'Подкрепление',  desc: '+2 бойца в строй (сверх предела — урон отряда).' },
+  { id: 'sqdmg',  name: 'Бронебойные',   desc: 'Урон бойцов отряда +35%.' },
+  { id: 'sqrate', name: 'Выучка',        desc: 'Скорострельность бойцов +25%.' },
   { id: 'dmg',    name: 'Калибр',        desc: 'Урон всего оружия +25%.' },
   { id: 'rate',   name: 'Темп',          desc: 'Скорострельность +20%.' },
   { id: 'armor',  name: 'Бронепластины', desc: '+50 брони и +20 к максимуму.' },
   { id: 'weapon', name: 'Трофей',        desc: 'Следующее оружие в линейке.' },
   { id: 'ult',    name: 'Связь',         desc: 'Ульта заряжена и набирается на 30% быстрее.' },
-  { id: 'vets',   name: 'Закалка',       desc: 'Бойцы на 15% чаще переживают удар.' },
+  { id: 'vets',   name: 'Закалка',       desc: 'Бойцы на 20% чаще переживают удар.' },
   { id: 'medic',  name: 'Медик',         desc: 'Вега восстанавливает 1 брони в секунду.' },
   { id: 'melee',  name: 'Ближний бой',   desc: 'Рукопашная Веги перезаряжается вдвое быстрее.' },
   { id: 'roll',   name: 'Рефлексы',      desc: 'Перекат перезаряжается за 1,2 с.' },

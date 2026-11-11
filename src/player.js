@@ -50,23 +50,12 @@ export function setWeapon(tier) {
   giveGun(G.hero.c, tier);
 }
 
-// Слот бойца в строю. Каре — плотно вокруг Веги, клин — треугольник, цепь — широкий фронт.
-const COLS = [0, -0.8, 0.8, -1.6, 1.6, -2.4, 2.4];
+// Малый отряд идёт шеренгой рядом с Вегой (камера смотрит из-за спины, поэтому позади никого)
+const SLOTS = [[-1.2, 0.3], [1.2, 0.3], [-2.4, 0.6], [2.4, 0.6], [-3.5, 0.95], [3.5, 0.95], [-0.7, 1.7], [0.7, 1.7]];
 function slot(i, out) {
-  const f = G.formation;
-  if (f === 'line') {
-    if (i < 10) { out.x = (i % 2 ? 1 : -1) * (0.9 + (i >> 1) * 0.9); out.z = 0.5; }
-    else { const j = i - 10; out.x = (j % 11 - 5) * 0.9; out.z = 1.4 + Math.floor(j / 11) * 0.85; }
-  } else if (f === 'wedge') {
-    let r = 1, k = i;
-    while (k >= Math.min(r + 1, 6)) { k -= Math.min(r + 1, 6); r++; }
-    const n = Math.min(r + 1, 6);
-    out.x = (k - (n - 1) / 2) * 0.8; out.z = 0.3 + r * 0.8;
-  } else {
-    if (i < 4) { out.x = [-0.95, 0.95, -1.9, 1.9][i]; out.z = 0.55; }
-    else { const j = i - 4; out.x = COLS[j % 7]; out.z = 1.4 + Math.floor(j / 7) * 0.85; }
-  }
-  if (G.defend) { out.x *= 0.62; out.z = 0.4 + (out.z - 0.4) * 0.7; }
+  const p = SLOTS[i % SLOTS.length];
+  out.x = p[0]; out.z = p[1];
+  if (G.defend) { out.x *= 0.6; out.z = 0.3 + (out.z - 0.3) * 0.7; }
   return out;
 }
 const _slot = { x: 0, z: 0 };
@@ -87,21 +76,22 @@ export function addSoldiers(n, snap = false) {
     let c = pool.pop();
     if (!c) { c = makeChar('soldier'); giveGun(c, 1); G.scene.add(c.root); }
     c.root.visible = true; c.root.rotation.set(0, 0, 0); c.root.position.y = 0;
-    const s = { c, x: G.hero.x, z: 2.5, cd: Math.random() * 0.5 };
+    const s = { c, x: G.hero.x, z: 2.5, cd: Math.random() * 0.5, hp: 2 };
     if (snap) { slot(G.squad.length, _slot); s.x = G.hero.x + _slot.x; s.z = _slot.z; }
     G.squad.push(s); added++;
   }
   // сверх предела отряда пополнение превращается в урон (по документу)
-  if (added < n) G.dmgMul += 0.02 * (n - added);
+  if (added < n) G.sqDmg += 0.1 * (n - added);
   return added;
 }
 
 export function killSoldier(i, armorCheck = true, vx = (Math.random() - 0.5) * 2, vz = 2.5) {
   const s = G.squad[i]; if (!s) return false;
   if (G.god || G.cry > 0) return false;
-  let save = G.mods.vet + (G.formation === 'square' ? 0.12 : 0) + (armorCheck ? 0.08 * rank('vest') : 0);
+  let save = G.mods.vet + (armorCheck ? 0.08 * rank('vest') : 0);
   if (G.defend) save = 1 - (1 - save) * 0.4;
   if (Math.random() < save) { sparks(s.x, 1.2, s.z, 6, 0.5, 0.75, 1); return false; }
+  if (--s.hp > 0) { blood(s.x, 1.2, s.z, 5); sparks(s.x, 1.2, s.z, 4); sfx.hit(); return false; }     // первое попадание боец держит
   blood(s.x, 1.1, s.z, 12);
   addCorpse(s.c, pool, s.x, s.z, vx, vz, 1);
   G.squad.splice(i, 1);
@@ -191,10 +181,31 @@ export function updatePlayer(dt) {
   }
   for (let i = 0; i < G.squad.length; i++) {
     const s = G.squad[i]; slot(i, _slot);
-    const tx = clamp(h.x + _slot.x, -ROAD_HALF + 0.2, ROAD_HALF - 0.2);
-    const lag = Math.max(3, 9 - _slot.z * 0.9);
+    let tx = clamp(h.x + _slot.x, -ROAD_HALF + 0.2, ROAD_HALF - 0.2);
+    // бойцы сами обходят заграждения: смещаются к свободному краю со стороны Веги
+    const walls = G.dbg ? G.dbg.barricades : null;
+    if (walls) for (let j = 0; j < walls.length; j++) {
+      const b = walls[j];
+      if (b.z < -13 || b.z > s.z + 0.6 || Math.abs(tx - b.x) > b.w / 2 + 0.45) continue;
+      const side = h.x >= b.x ? 1 : -1;
+      tx = clamp(b.x + side * (b.w / 2 + 0.55 + (i % 3) * 0.5), -ROAD_HALF + 0.2, ROAD_HALF - 0.2);
+    }
+    // и уходят из зон атак: к ближайшему краю, по возможности в сторону Веги
+    let danger = false;
+    const zs = G.dbgZones;
+    if (zs) for (let j = 0; j < zs.length; j++) {
+      const z = zs[j]; if (z.t < 0) continue;
+      const half = z.shape === 'circle' ? (Math.abs(s.z - z.z) < z.r ? Math.sqrt(z.r * z.r - (s.z - z.z) * (s.z - z.z)) : 0) : z.w / 2;
+      if (!half || Math.abs(tx - z.x) > half + 0.3) continue;
+      const side = Math.abs(h.x - z.x) > half ? Math.sign(h.x - z.x) : (tx >= z.x ? 1 : -1);
+      let nx = z.x + side * (half + 0.5 + (i % 3) * 0.45);
+      if (Math.abs(nx) > ROAD_HALF - 0.2) nx = z.x - side * (half + 0.5 + (i % 3) * 0.45);
+      tx = clamp(nx, -ROAD_HALF + 0.2, ROAD_HALF - 0.2); danger = true;
+    }
+    const lag = danger ? 12 : Math.max(4, 9 - _slot.z * 0.9);
     s.x += (tx - s.x) * Math.min(1, dt * lag);
     s.z += (_slot.z - s.z) * Math.min(1, dt * 5);
+    if (s.wall > 0) { s.wall -= dt; if (s.wall <= 0) s.wall = 0; }
     s.c.root.position.set(s.x, 0, s.z);
     animChar(s.c, h.step, run);
   }

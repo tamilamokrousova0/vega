@@ -48,7 +48,8 @@ function enterWorld(i, first = false) {
 function startRun(world = 0, practice = false) {
   clearPhysics();
   G.weaponTier = practice ? Math.min(world, 4) : 0; G.kills = 0;
-  resetSquad(3 + rank('squad') + (practice ? world * 4 : 0));
+  resetSquad(Math.min(8, 2 + rank('squad') + (practice ? Math.min(world, 3) : 0)));
+  G.sqRate = 1; G.sqDmg = 1 + (practice ? world * 0.3 : 0);
   setWeapon(G.weaponTier);
   G.dmgMul = 1 + 0.05 * rank('ap'); G.rateMul = 1;
   G.charges.medkit = rank('medkit');
@@ -56,6 +57,7 @@ function startRun(world = 0, practice = false) {
   G.mode = 'run'; G.paused = false; G.resting = false; G.timeScale = 1; G.slowmo = 0;
   pendingFn = null;
   newRun(world, practice);
+  if (practice) G.sqDmg = 1 + world * 0.3;
   enterWorld(world, true);
   show(ui.menu, false); show(ui.result, false); show(ui.arsenal, false); show(ui.pause, false); show(ui.rest, false); show(ui.hud, true);
   ui.ultName.textContent = ULT[G.ultKind];
@@ -210,9 +212,10 @@ function updateCamera(dt) {
     _a.set(h.x - (p ? 0.5 : 1.1) + Math.sin(G.time * 0.35) * 0.35, p ? 1.2 : 1.5, p ? -4.8 : -3.1);
     _b.set(h.x + (p ? 0 : 0.85), p ? 0.2 : 1.15, 0);
   } else {
-    const cx = h.x * 0.45, far = G.mode === 'boss' ? 1.12 : 1;     // на боссе камера отъезжает
-    if (G.portrait) { _a.set(cx, 14.5 * far, 13 * far); _b.set(cx, 0, -9); }
-    else { _a.set(cx, 8.8 * far, 10.6 * far); _b.set(cx, 0.6, -9.5); }
+    // почти от третьего лица: камера низко за спиной Веги; на боссе немного отъезжает и поднимается
+    const cx = h.x * 0.8, far = G.mode === 'boss' ? 1.3 : 1;
+    if (G.portrait) { _a.set(cx, 5.2 * far, 8.6 * far); _b.set(cx * 0.9, 1.4, -14); }
+    else { _a.set(cx, 3.7 * far, 6.6 * far); _b.set(cx * 0.9, 1.5, -15); }
   }
   const k = 1 - Math.exp(-dt * 4.5);
   camPos.lerp(_a, k); camLook.lerp(_b, k);
@@ -254,8 +257,7 @@ function updateHud() {
   const mods = [];
   if (r.event === 'blood') mods.push('Кровавая луна ×2');
   if (r.event === 'fog') mods.push('Туман');
-  if (r.risk > 0) mods.push('Риск ×1,25');
-  if (G.formation !== 'square') mods.push(G.formation === 'wedge' ? 'Клин' : 'Цепь');
+  if (G.sqDmg > 1.001 || G.sqRate > 1.001) mods.push(`Отряд: урон ×${G.sqDmg.toFixed(2)}, темп ×${G.sqRate.toFixed(2)}`);
   if (G.dmgMul > 1.001) mods.push(`Урон ×${G.dmgMul.toFixed(2)}`);
   if (G.rateMul > 1.001) mods.push(`Темп ×${G.rateMul.toFixed(2)}`);
   if (G.cry > 0) mods.push('Боевой клич');
@@ -266,7 +268,7 @@ function updateHud() {
   ui.ultBar.style.width = G.ult + '%';
   setCls(ui.btnUlt, 'ur', 'ready', G.ult >= 100);
   setCls(ui.btnDef, 'dh', 'held', G.defend);
-  _a.set(h.x, 2.75, 0).project(G.camera);
+  _a.set(h.x, 2.35, 0).project(G.camera);
   ui.squadTag.style.left = ((_a.x * 0.5 + 0.5) * window.innerWidth) + 'px';
   ui.squadTag.style.top = ((-_a.y * 0.5 + 0.5) * window.innerHeight) + 'px';
   setText(ui.squadTag, 'tag', G.squad.length + 1);

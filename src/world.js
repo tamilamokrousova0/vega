@@ -6,7 +6,7 @@ import { P, box, cyl, sph, cone, ico, merge, MAT } from './models.js';
 import { fire, steam, sparks, emitGlow, emitSolid } from './fx.js';
 import { setAmbient } from './ambient.js';
 
-const PI = Math.PI;
+const PI = Math.PI, LIGHT = new THREE.Color(0xc8d0d8);
 const W = { props: [], live: [], road: null, ground: null, sun: null, hemi: null, dust: null, dustVel: null, biome: null, sky: null, disc: null, halo: null, back: null, fireLights: [], flash: 0, b: null, wind: 0, fogK: 1, fogKT: 1, tint: 0, tintT: 0 };
 
 const BIOMES = {
@@ -102,7 +102,7 @@ function haloTex() {
 
 // ---------- Материалы подвижных частей ----------
 const KM = {
-  beam: new THREE.MeshBasicMaterial({ color: 0xcfd8e8, transparent: true, opacity: 0.055, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }),
+  beam: new THREE.MeshBasicMaterial({ color: 0xcfd8e8, transparent: true, opacity: 0.03, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }),
   warm: new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
   red: new THREE.MeshBasicMaterial({ color: 0xff2a1a }),
   green: new THREE.MeshBasicMaterial({ color: 0x66ffaa }),
@@ -482,10 +482,10 @@ function backdrop(key, fogHex) {
     for (let x = -320; x < 320; x += 40 + R() * 40) { const w = 30 + R() * 40, h = 18 + R() * 30; p.push(P(cyl(w * 0.4, w * 0.6, h, 8), dk(0.62), [x, h / 2, Z - R() * 30]), P(cyl(w * 0.2, w * 0.32, h * 0.4, 6), dk(0.6), [x + w * 0.1, h * 1.15, Z - 10])); }
     for (let x = -300; x < 300; x += 12) p.push(P(cyl(6, 14, 4 + R() * 5, 6), dk(0.72), [x, 2, Z + 20]));
   } else if (key === 'forest') {
-    for (let x = -300; x < 300; x += 5 + R() * 5) { const h = 28 + R() * 30; p.push(P(cone(7 + R() * 4, h, 6), dk(0.42 + R() * 0.2), [x, h / 2, Z + 60 - R() * 60])); }
+    for (let x = -300; x < 300; x += 5 + R() * 5) { const h = 28 + R() * 30; p.push(P(cone(7 + R() * 4, h, 12), dk(0.42 + R() * 0.2), [x, h / 2, Z + 60 - R() * 60])); }
   } else if (key === 'snow') {
-    for (let x = -340; x < 340; x += 50 + R() * 50) { const r = 60 + R() * 50, h = 50 + R() * 60, z = Z - 30 - R() * 40, ry = R() * 3; p.push(P(cone(r, h, 7), dk(0.7), [x, h / 2, z], [0, ry, 0]), P(cone(r * 0.42, h * 0.42, 7), dk(1.22), [x, h * 0.795, z], [0, ry, 0])); }
-    for (let x = -300; x < 300; x += 7) { const h = 12 + R() * 10; p.push(P(cone(3.5, h, 5), dk(0.5), [x, h / 2, Z + 70])); }
+    for (let x = -340; x < 340; x += 50 + R() * 50) { const r = 60 + R() * 50, h = 50 + R() * 60, z = Z - 30 - R() * 40, ry = R() * 3; p.push(P(cone(r, h, 14), dk(0.7), [x, h / 2, z], [0, ry, 0]), P(cone(r * 0.42, h * 0.42, 14), dk(1.22), [x, h * 0.795, z], [0, ry, 0])); }
+    for (let x = -300; x < 300; x += 7) { const h = 12 + R() * 10; p.push(P(cone(3.5, h, 10), dk(0.5), [x, h / 2, Z + 70])); }
   } else {
     for (let x = -300; x < 300; x += 22 + R() * 10) { const h = 80 + R() * 40; p.push(P(cyl(5, 6, h, 8), dk(0.55), [x, h / 2, Z + 50 - R() * 60])); }
     for (let i = 0; i < 6; i++) p.push(P(box(700, 3, 5), dk(0.5), [0, 18 + i * 14, Z - 10 + i * 6]));
@@ -508,7 +508,7 @@ export function initWorld(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.5;
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x000000, 20, 100);
   scene.background = new THREE.Color(0x000000);
@@ -554,7 +554,7 @@ export function initWorld(canvas) {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false); camera.aspect = w / h;
     G.portrait = camera.aspect < 0.85;
-    camera.fov = G.portrait ? 72 : 55; camera.updateProjectionMatrix();
+    camera.fov = G.portrait ? 74 : 60; camera.updateProjectionMatrix();
   };
   window.addEventListener('resize', resize); resize();
 }
@@ -562,7 +562,11 @@ export function initWorld(canvas) {
 export function setBiome(key) {
   if (W.biome === key) return;
   W.biome = key;
-  const b = W.b = BIOMES[key], s = G.scene;
+  const src = BIOMES[key], s = G.scene;
+  // общий подъём яркости: светлее дымка, небо, земля и оба источника света
+  const lift = (hex, k) => new THREE.Color(hex).lerp(LIGHT, k).getHex();
+  const b = W.b = Object.assign({}, src, { fog: lift(src.fog, 0.2), zenith: lift(src.zenith, 0.12), ground: lift(src.ground, 0.18), sky: lift(src.sky, 0.25), gnd: lift(src.gnd, 0.25),
+    sunI: src.sunI * 1.3, hemiI: src.hemiI * 1.7, near: src.near * 1.5, far: src.far * 1.25 });
   s.fog.color.set(b.fog); s.fog.near = b.near; s.fog.far = b.far; s.background.set(b.fog);
   W.ground.material.color.set(b.ground); W.road.material.color.set(b.road); W.curb.material.color.set(b.road);
   W.sun.color.set(b.sun); W.sun.intensity = b.sunI;

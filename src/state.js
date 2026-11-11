@@ -8,6 +8,7 @@ export const G = {
   hero: null, squad: [],
   weaponTier: 0, dmgMul: 1, rateMul: 1,
   formation: 'square', defend: false, cry: 0,
+  sqRate: 1, sqDmg: 1,          // прокачка бойцов отряда из ящиков
   enemies: [], boss: null, elite: null,
   kills: 0,
   ult: 0, ultKind: 'air',

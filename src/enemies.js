@@ -22,6 +22,9 @@ export function spawnEnemy(type, x, z, opt = {}) {
     type, def, c, pool: pl, x, z, r: def.r, hp, maxHp: hp, alive: true, bites: def.bites,
     kx: 0, kz: 0, mass: def.r * def.r * 5, speed: def.speed * (opt.fast || 1) * rand(0.85, 1.15), aim: rand(-2.3, 2.3), t: rand(0, 6), h: 1.15 * def.scale, spit: rand(0.8, 2.4),
   };
+  const bs = c.root.userData.bs || (c.root.userData.bs = c.root.scale.x);
+  c.root.scale.setScalar(bs);
+  if (opt.rise) { e.rise = 0.55; c.root.scale.y = bs * 0.05; dustBurst(x, z, 2); }    // вылезает из земли
   c.root.position.set(x, 0, z);
   G.enemies.push(e);
   return e;
@@ -124,6 +127,7 @@ export function updateEnemies(dt) {
       continue;
     }
     e.t += dt;
+    if (e.rise > 0) { e.rise -= dt; const bs = e.c.root.userData.bs; e.c.root.scale.y = bs * Math.min(1, 1.05 - Math.max(0, e.rise) / 0.55); }
     if (e.flee) {                             // золотой зомби убегает от отряда
       e.z -= 1.6 * dt; e.x += Math.sin(e.t * 1.7) * 2.2 * dt;
       e.c.root.position.set(e.x, 0, e.z); e.c.root.rotation.y = 0; animChar(e.c, e.t * 9, 1);
@@ -167,7 +171,7 @@ export function updateEnemies(dt) {
           sparks(e.x, 1.2, e.z, 5, 1, 0.9, 0.7); sfx.hit();
           damage(e, 75 * G.hpMul() * (1 + G.weaponTier * 0.25), (e.x - h.x) * 6, -11);
           if (G.hooks.onMelee) G.hooks.onMelee(!e.alive);
-        } else { hurtHero(e.def.dmg, 'bite'); bite(e); }
+        } else { hurtHero(e.def.dmg, 'bite'); bite(e); if (e.alive && e.elite) e.kz = -16 / e.mass * 6; }   // громила после удара отшатывается
       }
       else {
         for (let j = 0; j < sq.length; j++) {
@@ -239,7 +243,7 @@ function fireZone(z) {
   if (z.shape === 'circle') {
     if (z.fx === 'acid') acid(z.x, z.z, z.r); else { explosion(z.x, z.z, z.r); debris(z.x, 0.2, z.z, 6, 0x3a3a3a, 0.14, 7); }
     impulse(z.x, z.z, z.r * 1.3, 8);
-    let cap = Math.max(3, Math.ceil(sq.length * 0.25));
+    let cap = 2;
     for (let i = sq.length - 1; i >= 0 && cap > 0; i--) {
       const s = sq[i], dx = s.x - z.x, dz = s.z - z.z;
       if (dx * dx + dz * dz < z.r * z.r && killSoldier(i, false, dx * 3, dz * 3 + 2)) cap--;
@@ -250,7 +254,7 @@ function fireZone(z) {
     for (let k = 0; k < 7; k++) dustBurst(z.x + rand(-z.w, z.w) * 0.45, 7 - k * 3, 4);
     shake(0.5); sfx.explosion(false);
     for (let k = 0; k < 4; k++) debris(z.x + rand(-z.w, z.w) * 0.4, 0.2, rand(-2, 6), 3, 0x4a4a48, 0.15, 6);
-    let cap = Math.max(3, Math.ceil(sq.length * 0.25));
+    let cap = 2;
     for (let i = sq.length - 1; i >= 0 && cap > 0; i--) if (Math.abs(sq[i].x - z.x) < z.w / 2 && killSoldier(i, false, rand(-2, 2), 5)) cap--;
     if (Math.abs(h.x - z.x) < z.w / 2 + 0.15) hurtHero(z.dmg, z.src);
   }

@@ -1,9 +1,9 @@
 // Бесконечный забег: сегменты → волна (5 сегментов + мини-босс + привал) → биом (3 волны + босс) → цикл.
 // «Директор» покупает врагов на бюджет угрозы и подстраивает его под потери отряда (не более ±15%).
 import { G, rand, clamp } from './state.js';
-import { WORLDS, ENEMIES, SEGMENTS, SEG_DUR, SCROLL, UPGRADES, WEAPONS } from './config.js';
+import { WORLDS, ENEMIES, SEGMENTS, SEG_DUR, SCROLL, UPGRADES, WEAPONS, SQUAD_MAX } from './config.js';
 import { spawnEnemy } from './enemies.js';
-import { spawnGatePair, spawnCrate, spawnCage, spawnMed, spawnBarrel, spawnBarricade } from './gates.js';
+import { spawnCrate, spawnCage, spawnMed, spawnBarrel, spawnBarricade } from './gates.js';
 import { spawnBoss } from './boss.js';
 import { addSoldiers } from './player.js';
 import { upgradeWeapon, airstrike } from './weapons.js';
@@ -14,7 +14,7 @@ import { sfx } from './audio.js';
 
 const SEG_KEYS = Object.keys(SEGMENTS);
 const WAVES = 3, SEGS = 5;
-const THREAT = 2.2;     // масштаб бюджета угрозы: сколько «очков» врагов приходится на сегмент
+const THREAT = 4.3;     // масштаб бюджета угрозы: сколько «очков» врагов приходится на сегмент
 
 export function worldDef(i) {
   const r = G.run, n = WORLDS.length;
@@ -35,7 +35,7 @@ export function newRun(startWorld = 0, practice = false) {
     score: 0, streak: 0, risk: 0, time: 0, dist: 0, kills: 0, perfect: 0, rescued: 0, worldsCleared: 0,
     event: null, eventLeft: 0, eventT: rand(100, 150), revived: false,
   };
-  G.level = startWorld; G.ult = 0; G.cry = 0; G.elite = null; G.formation = 'square';
+  G.level = startWorld; G.ult = 0; G.cry = 0; G.elite = null; G.formation = 'square'; G.sqRate = 1; G.sqDmg = 1;
   G.mods = { vet: 0, medic: 0, meleeCd: 0.7, rollCd: 2, ultGain: 1 + 0.2 * rank('ultfast') };
   startSegment();
 }
@@ -44,7 +44,7 @@ export function newRun(startWorld = 0, practice = false) {
 export function comboMul() { return 1 + Math.min(7, G.run.streak / 30); }
 export function addScore(v) {
   const r = G.run;
-  r.score += v * comboMul() * (r.risk > 0 ? 1.25 : 1) * Math.pow(1.5, r.cycle - 1) * (r.event === 'blood' ? 2 : 1);
+  r.score += v * comboMul() * Math.pow(1.5, r.cycle - 1) * (r.event === 'blood' ? 2 : 1);
 }
 function chargeUlt(v) { G.ult = Math.min(100, G.ult + v * G.mods.ultGain); }
 
@@ -60,12 +60,25 @@ export function bindRunHooks() {
   H.onPerfect = () => { const r = G.run; if (!r) return; r.perfect++; addScore(500); chargeUlt(25); G.slowmo = 1.1; toast('Идеальное уклонение', 'good'); sfx.gateGood(); };
   H.onMelee = killed => { chargeUlt(3); if (killed) { addScore(250); const h = G.hero; h.armor = Math.min(h.maxArmor, h.armor + 3); } };
   H.onRisk = () => { if (G.run) G.run.risk = 60; };
-  H.onCrate = () => upgradeWeapon();
+  H.onCrate = e => { if (e.kind === 'weapon') { G.run.lastGun = G.run.time; upgradeWeapon(); } else loot(); };
   H.onPickup = e => {
     const r = G.run, h = G.hero;
-    if (e.type === 'cage') { addSoldiers(3); r.rescued += 3; addScore(900); toast('Спасено 3 бойца', 'good'); sfx.gateGood(); }
+    if (e.type === 'cage') { const full = G.squad.length >= SQUAD_MAX; addSoldiers(1); r.rescued++; addScore(300); toast(full ? 'Боец спасён: урон отряда +10%' : 'Боец спасён', 'good'); sfx.gateGood(); }
     else { h.armor = Math.min(h.maxArmor, h.armor + 35); toast('Броня +35', 'good'); sfx.gateGood(); }
   };
+}
+
+// Случайное улучшение из ящика (ворот больше нет — всё снаряжение лежит в ящиках)
+function loot() {
+  const h = G.hero, x = Math.random(), full = G.squad.length >= SQUAD_MAX;
+  if (x < 0.22 && !full) { addSoldiers(1); toast('+1 боец', 'good'); }
+  else if (x < 0.46) { G.sqRate += 0.15; toast('Отряд: темп огня +15%', 'good'); }
+  else if (x < 0.70) { G.sqDmg += 0.2; toast('Отряд: урон +20%', 'good'); }
+  else if (x < 0.82 && h.armor < h.maxArmor - 10) { h.armor = Math.min(h.maxArmor, h.armor + 30); toast('Броня +30', 'good'); }
+  else if (x < 0.92) { chargeUlt(35); toast('Заряд ульты +35%', 'good'); }
+  else if (G.weaponTier < WEAPONS.length - 1 && x > 0.96 && G.run.time - (G.run.lastGun || -99) > 90) { G.run.lastGun = G.run.time; upgradeWeapon(); }
+  else { G.sqDmg += 0.2; toast('Отряд: урон +20%', 'good'); }
+  sfx.gateGood();
 }
 
 export function useUlt() {
@@ -78,11 +91,12 @@ export function useUlt() {
 export function squadPower() {
   const w = WEAPONS[G.weaponTier];
   const hero = w.kind === 'laser' ? w.dps : w.rate * w.dmg * (w.pellets || 1) * (w.kind === 'rocket' ? 1.6 : 1);
-  return (hero * G.dmgMul + G.squad.length * w.sRate * w.sDmg * G.dmgMul) * (w.kind === 'laser' ? 1 : G.rateMul);
+  const squad = G.squad.length * w.sRate * w.sDmg * 2.56 * G.sqRate * G.sqDmg * G.dmgMul * G.rateMul;
+  return hero * G.dmgMul * (w.kind === 'laser' ? 1 : G.rateMul) + squad;
 }
 // Здоровье врагов подтягивается к силе отряда: число врагов ограничено движком, дальше растёт живучесть
 function threatHp(rate, k) {
-  const base = rate * 30 * G.hpMul();
+  const base = rate * 24 * G.hpMul();
   const want = 0.36 * squadPower() * G.run.adapt * k;
   return clamp(Math.pow(Math.max(1, want / Math.max(1, base)), 0.75), 1, 10);
 }
@@ -111,11 +125,13 @@ function startSegment() {
   if (def.heavy) r.heavy++; else if (type === 'supply') r.heavy = 0;
   r.t = 0; r.dur = def.dur || SEG_DUR; r.phase = 'seg';
   const budget = THREAT * 40 * Math.pow(1 + 0.09 * r.seg, 1.4) * Math.pow(1.35, r.cycle - 1) * r.adapt * def.k;
-  r.rate = Math.min(budget / r.dur, 13 * def.k); r.spawnT = 1.2;
+  // поток врагов не превышает того, что отряд способен перемолоть (примерно половина его урона в секунду)
+  const afford = 0.42 * squadPower() * r.adapt * def.k / (24 * G.hpMul());
+  r.rate = Math.max(1.5 * def.k, Math.min(budget / r.dur, 24 * def.k, afford)); r.spawnT = 1.2;
   r.hpK = threatHp(r.rate, def.k);
-  r.gateT = def.gate ? 2.5 : 1e9; r.wallT = def.wall ? rand(5, 9) : 1e9; r.sideT = def.sides ? 2.5 : 1e9;
-  r.cages = def.cages ? 2 : 0; r.cageT = 2.5; r.supplyT = def.supply ? 2 : 1e9;
-  const tag = { barricade: 'Держать оборону', ambush: 'Засада', panic: 'Паника: бегуны', rescue: 'Спасите пленных', narrow: 'Узкое место', supply: 'Снабжение' }[type];
+  r.gateT = def.crate ? 2.5 : 1e9; r.wallT = def.wall ? rand(5, 9) : 1e9; r.sideT = def.sides ? 2.5 : 1e9;
+  r.cages = def.cages || 0; r.cageT = 2.5; r.supplyT = def.supply ? 2 : 1e9;
+  const tag = { barricade: 'Держать оборону', ambush: 'Засада', panic: 'Паника: бегуны', rescue: 'Спасите пленных', narrow: 'Узкое место', supply: 'Снабжение', gates: 'Склад: ящики со снаряжением' }[type];
   if (tag) toast(tag, def.heavy ? 'bad' : 'good');
 }
 
@@ -138,13 +154,13 @@ function spawnGroup(def, rateK) {
   if (def.close) {                         // из люков и с обочин, вплотную
     const side = Math.random() < 0.5 ? -1 : 1, z0 = rand(-30, -20);
     dustBurst(side * 4.6, z0, 6);
-    for (let k = 0; k < n; k++) spawnEnemy(type, side * rand(3.6, 4.9), z0 - rand(0, 4), { hpK: r.hpK });
+    for (let k = 0; k < n; k++) spawnEnemy(type, side * rand(3.6, 4.9), z0 - rand(0, 4), { hpK: r.hpK, rise: 1 });
   } else if (def.stop) {
     const cx = rand(-4, 4);
-    for (let k = 0; k < n; k++) spawnEnemy(type, clamp(cx + rand(-1.9, 1.9), -4.9, 4.9), -62 - rand(0, 8), { fast: 2.6, hpK: r.hpK });
+    for (let k = 0; k < n; k++) spawnEnemy(type, clamp(cx + rand(-1.9, 1.9), -4.9, 4.9), -40 - rand(0, 8), { fast: 2.2, hpK: r.hpK, rise: 1 });
   } else {
     const cx = rand(-4, 4);
-    for (let k = 0; k < n; k++) spawnEnemy(type, clamp(cx + rand(-1.9, 1.9), -4.9, 4.9), -92 - rand(0, 8), { hpK: r.hpK });
+    for (let k = 0; k < n; k++) spawnEnemy(type, clamp(cx + rand(-1.9, 1.9), -4.9, 4.9), -56 - rand(0, 9), { hpK: r.hpK, rise: 1 });
   }
 }
 
@@ -154,18 +170,18 @@ function updateSegment(dt) {
   const blood = r.event === 'blood' ? 2 : 1;
   r.spawnT -= dt;
   let guard = 0;
-  while (r.spawnT <= 0 && G.enemies.length < 230 && guard++ < 6) spawnGroup(def, blood);
+  while (r.spawnT <= 0 && G.enemies.length < 240 && guard++ < 8) spawnGroup(def, blood);
   if (r.spawnT < -2) r.spawnT = 0;
   if (moving) {
-    if ((r.gateT -= dt) <= 0) { r.gateT = def.gate; spawnGatePair(-92, { rich: r.type === 'gates' || r.type === 'supply', locked: r.seg > 2 && Math.random() < 0.2 }); }
-    if ((r.wallT -= dt) <= 0) { r.wallT = def.wall * rand(0.8, 1.3); spawnBarricade(rand(-3.4, 3.4), -84); }
-    if ((r.sideT -= dt) <= 0) { r.sideT = def.sides; spawnBarricade(-3.7, -88); spawnBarricade(3.7, -88); }
-    if ((r.barrelT -= dt) <= 0) { r.barrelT = rand(6, 11); spawnBarrel(rand(-4.3, 4.3), -90); }
-    if (r.cages > 0 && (r.cageT -= dt) <= 0) { r.cages--; r.cageT = 10; spawnCage((Math.random() < 0.5 ? -1 : 1) * 4.2, -90); }
+    if ((r.gateT -= dt) <= 0) { r.gateT = def.crate * rand(0.8, 1.25); spawnCrate(rand(-4, 4), -66); }
+    if ((r.wallT -= dt) <= 0) { r.wallT = def.wall * rand(0.8, 1.3); spawnBarricade(rand(-3.4, 3.4), -70); }
+    if ((r.sideT -= dt) <= 0) { r.sideT = def.sides; spawnBarricade(-3.7, -72); spawnBarricade(3.7, -72); }
+    if ((r.barrelT -= dt) <= 0) { r.barrelT = rand(6, 11); spawnBarrel(rand(-4.3, 4.3), -66); }
+    if (r.cages > 0 && (r.cageT -= dt) <= 0) { r.cages--; r.cageT = 8; spawnCage((Math.random() < 0.5 ? -1 : 1) * 4.2, -68); }
     if ((r.supplyT -= dt) <= 0) {
       r.supplyT = 1e9;
-      if (!r.crateGiven) { r.crateGiven = true; spawnCrate(rand(-3, 3), -90); }
-      spawnMed(rand(-3.8, 3.8), -100); spawnCage((Math.random() < 0.5 ? -1 : 1) * 4.2, -112);
+      if (!r.crateGiven) { r.crateGiven = true; spawnCrate(rand(-3, 3), -66, 'weapon'); }
+      spawnMed(rand(-3.8, 3.8), -76); spawnCage((Math.random() < 0.5 ? -1 : 1) * 4.2, -88);
     }
   }
   if (r.t >= r.dur) {
@@ -181,7 +197,7 @@ function startMini() {
   r.phase = 'mini'; r.t = 0; r.def = SEGMENTS.avenue; r.type = 'mini';
   r.rate = THREAT * 40 * Math.pow(1 + 0.09 * r.seg, 1.4) * Math.pow(1.35, r.cycle - 1) * 0.3 / SEG_DUR; r.spawnT = 2;
   r.hpK = threatHp(r.rate, 0.6);
-  const e = spawnEnemy('brute', 0, -92, { hpK: Math.max((1 + 0.35 * r.wave) * Math.pow(1.35, r.cycle - 1), squadPower() * 9 / (1500 * G.hpMul())) });
+  const e = spawnEnemy('brute', 0, -66, { hpK: Math.max((1 + 0.35 * r.wave) * Math.pow(1.35, r.cycle - 1), squadPower() * 9 / (1500 * G.hpMul())) });
   G.elite = e; r.eliteRef = e;
   toast('Мини-босс: Громила', 'big'); sfx.roar();
 }
@@ -191,7 +207,7 @@ export function startBoss() {
   r.phase = 'boss'; r.bossLoss = false; r.type = 'boss';
   G.mode = 'boss';
   // бой с боссом рассчитан примерно на 40 с огня всем отрядом, но не короче базового здоровья
-  G.bossHpMin = squadPower() * 20;
+  G.bossHpMin = squadPower() * 14;
   spawnBoss(worldDef(r.world).boss);
 }
 
@@ -209,13 +225,15 @@ function openRest(kind) {
 export function chooseUpgrade(id) {
   const r = G.run, h = G.hero;
   switch (id) {
-    case 'men': addSoldiers(6); break;
+    case 'men': addSoldiers(2); break;
+    case 'sqdmg': G.sqDmg += 0.35; break;
+    case 'sqrate': G.sqRate += 0.25; break;
     case 'dmg': G.dmgMul += 0.25; break;
     case 'rate': G.rateMul += 0.2; break;
     case 'armor': h.maxArmor += 20; h.armor = Math.min(h.maxArmor, h.armor + 50); break;
     case 'weapon': upgradeWeapon(); break;
     case 'ult': G.ult = 100; G.mods.ultGain *= 1.3; break;
-    case 'vets': G.mods.vet += 0.15; break;
+    case 'vets': G.mods.vet += 0.2; break;
     case 'medic': G.mods.medic += 1; break;
     case 'melee': G.mods.meleeCd = 0.35; break;
     case 'roll': G.mods.rollCd = 1.2; break;

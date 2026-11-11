@@ -60,7 +60,7 @@ export function initFx() {
   G.scene.add(solid.points, glow.points);
 
   const N = 70;
-  const cg = new THREE.CircleGeometry(1, 9); cg.rotateX(-Math.PI / 2);
+  const cg = new THREE.CircleGeometry(1, 22); cg.rotateX(-Math.PI / 2);
   decals = new THREE.InstancedMesh(cg, new THREE.MeshBasicMaterial({ color: 0x2a0606, transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), N);
   decals.frustumCulled = false; decals.renderOrder = 1;
   for (let i = 0; i < N; i++) decalData.push({ x: 0, z: 999, s: 0, r: 0, sx: 1 });

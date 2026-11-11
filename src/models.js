@@ -6,11 +6,36 @@ const _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const PI = Math.PI;
 
 export const P = (geo, color, pos = [0, 0, 0], rot = [0, 0, 0], scl = [1, 1, 1]) => ({ geo, color, pos, rot, scl });
-export const box = (x, y, z) => new THREE.BoxGeometry(x, y, z);
-export const cyl = (a, b, h, s = 8) => new THREE.CylinderGeometry(a, b, h, s);
-export const sph = (r, w = 10, h = 8) => new THREE.SphereGeometry(r, w, h);
-export const cone = (r, h, s = 7) => new THREE.ConeGeometry(r, h, s);
-export const ico = (r, d = 0) => new THREE.IcosahedronGeometry(r, d);
+// Параллелепипед со скруглёнными рёбрами: вершины стягиваются к «внутренней» коробке и выносятся на радиус r
+const _v = new THREE.Vector3(), _k = new THREE.Vector3();
+export function rbox(x, y, z, r, seg = 2) {
+  const g = new THREE.BoxGeometry(x, y, z, seg, seg, seg), p = g.attributes.position, n = g.attributes.normal;
+  const hx = x / 2 - r, hy = y / 2 - r, hz = z / 2 - r;
+  for (let i = 0; i < p.count; i++) {
+    _v.fromBufferAttribute(p, i);
+    _k.set(Math.max(-hx, Math.min(hx, _v.x)), Math.max(-hy, Math.min(hy, _v.y)), Math.max(-hz, Math.min(hz, _v.z)));
+    _v.sub(_k); const len = _v.length();
+    if (len > 1e-6) { _v.multiplyScalar(1 / len); p.setXYZ(i, _k.x + _v.x * r, _k.y + _v.y * r, _k.z + _v.z * r); n.setXYZ(i, _v.x, _v.y, _v.z); }
+  }
+  return g;
+}
+// мелкие детали остаются простыми коробками, всё крупнее 9 см получает скруглённые рёбра
+export const box = (x, y, z) => { const m = Math.min(x, y, z); return m >= 0.09 ? rbox(x, y, z, Math.min(m * 0.24, 0.35), m > 0.7 ? 3 : 2) : new THREE.BoxGeometry(x, y, z); };
+export const cyl = (a, b, h, s = 14) => new THREE.CylinderGeometry(a, b, h, Math.max(s, 10));
+export const sph = (r, w = 16, h = 12) => new THREE.SphereGeometry(r, Math.max(w, 10), Math.max(h, 8));
+export const cone = (r, h, s = 12) => new THREE.ConeGeometry(r, h, Math.max(s, 10));
+// гладкая органическая форма (камни, кроны, наросты) вместо гранёного многогранника
+export function blob(r = 1, seed = Math.random() * 100) {
+  const g = new THREE.SphereGeometry(r, 14, 10), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) / r, y = p.getY(i) / r, z = p.getZ(i) / r;
+    const d = 1 + 0.2 * Math.sin(x * 2.3 + seed) * Math.sin(y * 2.9 + seed * 1.7) * Math.sin(z * 2.6 + seed * 2.3) + 0.08 * Math.sin(x * 5.1 + seed * 3) * Math.sin(z * 4.7 + seed);
+    p.setXYZ(i, x * d * r, y * d * r, z * d * r);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+export const ico = r => blob(r);
 
 // Склейка частей в одну геометрию с цветами вершин. grit — «грязь»: случайное затемнение по треугольникам.
 export function merge(parts, grit = 0) {

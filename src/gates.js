@@ -35,7 +35,7 @@ function geos() {
   for (const x of [-0.3, 0.3]) cp.push(P(cyl(0.16, 0.14, 0.6, 6), 0x3d4434, [x, 1.2, 0]), P(sph(0.12, 6, 5), 0x8a735e, [x, 1.65, 0]), P(cyl(0.12, 0.1, 0.9, 6), 0x353b2e, [x, 0.5, 0]));
   cageGeo = merge(cp, 0.1);
   barGeo = new THREE.PlaneGeometry(1.5, 0.12);
-  labels.crate = textTex('ОРУЖИЕ', '', 0); labels.cage = textTex('ПЛЕННЫЕ', '', 0); labels.med = textTex('АПТЕЧКА', '', 0);
+  labels.crate = textTex('?', 'СНАРЯЖЕНИЕ', 0); labels.weapon = textTex('ОРУЖИЕ', '', 0); labels.cage = textTex('ПЛЕННЫЙ', '', 0); labels.med = textTex('АПТЕЧКА', '', 0);
 }
 
 function draw(ctx, big, small, charge) {
@@ -180,10 +180,13 @@ function pickup(type, geo, x, z, hp, r, labelTex, h = 1.5) {
   const back = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0x15171a, fog: false })); back.position.set(0, h, -0.01); back.scale.set(1.04, 1.5, 1); root.add(back);
   const txt = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false, fog: false })); txt.position.set(0, h + 0.6, 0); root.add(txt);
   root.position.set(x, 0, z); G.scene.add(root);
-  G.enemies.push({ type, static: true, c: { root }, pool: null, x, z, r, h: 1, hp, maxHp: hp, alive: true, bar });
+  const e = { type, static: true, c: { root }, pool: null, x, z, r, h: 1, hp, maxHp: hp, alive: true, bar };
+  G.enemies.push(e);
+  return e;
 }
-const pickHp = k => k * (1 + G.weaponTier * 1.2) * (1 + G.squad.length * 0.06) * (1 + 0.25 * G.level);
-export function spawnCrate(x, z) { geos(); pickup('crate', crateGeo, x, z, pickHp(150), 0.85, labels.crate); }
+const pickHp = k => k * (1 + G.weaponTier * 1.2) * (1 + G.squad.length * 0.12 * G.sqDmg * G.sqRate) * (1 + 0.25 * G.level);
+// kind: 'loot' — случайное улучшение, 'weapon' — следующее оружие Веги
+export function spawnCrate(x, z, kind = 'loot') { geos(); pickup('crate', crateGeo, x, z, pickHp(kind === 'weapon' ? 150 : 70), 0.85, kind === 'weapon' ? labels.weapon : labels.crate).kind = kind; }
 export function spawnCage(x, z) { geos(); pickup('cage', cageGeo, x, z, pickHp(90), 0.8, labels.cage, 2.5); }
 export function spawnMed(x, z) { geos(); pickup('med', medGeo, x, z, pickHp(60), 0.7, labels.med, 1.3); }
 
@@ -226,7 +229,7 @@ export function updateGates(dt) {
       if (!b.hitHero && b.z < 0.8 && Math.abs(h.x - b.x) < b.w / 2 + 0.3) { b.hitHero = true; hurtHero(25, 'wall'); }
       for (let j = G.squad.length - 1; j >= 0; j--) {
         const s = G.squad[j];
-        if (Math.abs(s.z - b.z) < 0.5 && Math.abs(s.x - b.x) < b.w / 2 + 0.1) killSoldier(j, false, 0, 6);
+        if (!s.wall && Math.abs(s.z - b.z) < 0.5 && Math.abs(s.x - b.x) < b.w / 2 + 0.1) { s.wall = 0.8; killSoldier(j, false, 0, 6); }
       }
     }
     if (b.z > 14) { G.scene.remove(b.m); barricades.splice(i, 1); }

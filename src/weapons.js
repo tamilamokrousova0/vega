@@ -11,7 +11,7 @@ import { sfx } from './audio.js';
 import { rank } from './arsenal.js';
 import { casing } from './physics.js';
 
-const MAXB = 640, BSPEED = 64, RANGE = -66;
+const MAXB = 640, BSPEED = 64, RANGE = -42;     // дальность огня: бой идёт близко к камере
 const bullets = [], rockets = [], rocketPool = [], grenades = [], grenadePool = [];
 let bmesh, rocketGeo, laser, drone, droneCd = 0, grenadeCd = 3, air = null;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _up = new THREE.Vector3(0, 1, 0);
@@ -77,7 +77,7 @@ function hitScan(x, pz, nz, pad) {
 export function updateWeapons(dt) {
   const h = G.hero, w = WEAPONS[G.weaponTier];
   const active = (G.mode === 'run' || G.mode === 'boss') && !h.dead;
-  const dmgMul = G.dmgMul * (G.formation === 'wedge' ? 1.2 : 1), rateMul = G.rateMul * (G.defend ? 0.5 : 1) * (G.cry > 0 ? 2 : 1);
+  const dmgMul = G.dmgMul, rateMul = G.rateMul * (G.defend ? 0.5 : 1) * (G.cry > 0 ? 2 : 1);
 
   // --- героиня
   let lasing = false;
@@ -116,7 +116,7 @@ export function updateWeapons(dt) {
       }
     }
     // --- бойцы
-    const sr = w.sRate * rateMul, sd = w.sDmg * dmgMul;
+    const sr = w.sRate * rateMul * G.sqRate * 1.6, sd = w.sDmg * dmgMul * G.sqDmg * 1.6;
     for (let i = 0; i < G.squad.length; i++) {
       const s = G.squad[i];
       s.cd -= dt;
