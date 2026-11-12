@@ -7,6 +7,7 @@ zombie_hazmat.glb — "Zombie Hazmat", автор LxNazarov
                     https://sketchfab.com/3d-models/49b3b4307f6a4d2386fdb02354158d04
 mutant.glb        — "Three-Head Baby Mutant", автор LxNazarov
                     https://sketchfab.com/3d-models/a769a92a263d47488b8fb2136c2759fb
-vega.glb          — "Cyberpunk Assassin Girl Free Rigged", автор Ilya.Anchouz.Danilov
-                    https://sketchfab.com/3d-models/b7201c11c0ba494ca4ef158884ce4a05
-                    (материал переведён в стандартный PBR; анимации берутся со скелета-манекена, см. src/skin.js)
+vega.glb          — "City Survival Girl", автор dartp
+                    https://sketchfab.com/3d-models/d1697bfee656442498213a36aaa3b150
+                    (текстуры уменьшены до 512 px, убраны касательные и анимация-поза;
+                     позы берутся со скелета-манекена, см. src/skin.js)

@@ -441,6 +441,10 @@ function bossChar(kind, scale) {
 
 export async function loadActors(onProgress) {
   const loader = new GLTFLoader();
+  const manP = fetch(CUSTOM + 'manifest.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  // свои модели начинают качаться сразу, параллельно с манекенами; одинаковый файл качается один раз
+  manP.then(man => { if (man && typeof man === 'object') for (const k of Object.keys(man)) { const e = man[k]; if (k !== 'props' && e && safeFile(e.file)) preload(loader, e.file); } });
+  loadCustom.man = manP;
   let done = 0; const step = () => { if (onProgress) onProgress(++done / 3); };
   const [f, u1, u2] = await Promise.all(['Mannequin_F.glb', 'UAL1.glb', 'UAL2.glb'].map(n => loader.loadAsync(DIR + n).then(g => { step(); return g; })));
   SEX.f = extract(f); SEX.m = extract(u1);
@@ -534,7 +538,7 @@ function inPlace(clip) {
 }
 async function makeFamily(loader, role, e) {
   if (!safeFile(e.file)) throw new Error('файл должен лежать в assets/custom');
-  const gltf = await loader.loadAsync(CUSTOM + e.file);
+  const gltf = await preload(loader, e.file);
   const src = gltf.scene, meshes = [];
   src.updateMatrixWorld(true);
   // жёсткие детали на костях (оружие в руке, шлем) превращаем в части со скелетом, чтобы они жили на общих «куклах»
@@ -648,9 +652,11 @@ function soloChar(fam, kind, scale, boss) {
   return c;
 }
 
+const preloaded = {};
+function preload(loader, file) { return preloaded[file] || (preloaded[file] = loader.loadAsync(CUSTOM + file)); }
 async function loadCustom(loader) {
-  let man;
-  try { const r = await fetch(CUSTOM + 'manifest.json', { cache: 'no-store' }); if (!r.ok) return; man = await r.json(); } catch (e) { return; }
+  const man = await loadCustom.man;
+  const fams = {};
   if (!man || typeof man !== 'object') return;
   for (const role of Object.keys(man)) {
     const e = man[role];
@@ -658,14 +664,14 @@ async function loadCustom(loader) {
     if (role === 'heroSkin') {
       try {
         if (!safeFile(e.file)) throw new Error('файл должен лежать в assets/custom');
-        const g = await loader.loadAsync(CUSTOM + e.file);
+        const g = await preload(loader, e.file);
         HERO_SKIN = { scene: g.scene, hide: Array.isArray(e.hide) ? e.hide.filter(x => typeof x === 'string') : [], scale: +e.scale || 1 };
         console.info(`Модель героини подключена: ${e.file}`);
       } catch (err) { console.warn('Модель героини не подключена, остаётся манекен:', err.message || err); }
       continue;
     }
     if (role !== 'hero' && !KIND[role] && !BOSS_LOOK[role]) { console.warn(`manifest.json: неизвестная роль «${role}»`); continue; }
-    try { FAM[role] = await makeFamily(loader, role, e); console.info(`Своя модель подключена: ${role} ← ${e.file}`); }
+    try { const key = JSON.stringify(e); FAM[role] = fams[key] || (fams[key] = await makeFamily(loader, role, e)); console.info(`Своя модель подключена: ${role} ← ${e.file}`); }
     catch (err) { console.warn(`Модель «${role}» не подключена, остаётся манекен:`, err.message || err); }
   }
   const props = man.props && typeof man.props === 'object' ? man.props : {};

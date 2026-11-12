@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Уменьшает текстуры внутри GLB (PNG → JPEG, сторона не больше N) и убирает ненужные анимации.
-   python3 tools/shrink_glb.py вход.glb выход.glb [--size 1024] [--keep Клип1,Клип2]
+   python3 tools/shrink_glb.py вход.glb выход.glb [--size 1024] [--keep Клип1,Клип2] [--no-tangents]
    Текстуры с прозрачностью (материал не OPAQUE) остаются PNG. Нужен macOS (утилита sips)."""
 import json, struct, sys, os, subprocess, tempfile
 
@@ -17,6 +17,13 @@ def main():
         if m.get('alphaMode', 'OPAQUE') != 'OPAQUE':
             t = m.get('pbrMetallicRoughness', {}).get('baseColorTexture')
             if t is not None: alpha.add(j['textures'][t['index']].get('source'))
+    if '--uv0' in a:      # оставить только первый набор текстурных координат и убрать цвета вершин
+        for me in j.get('meshes', []):
+            for pr in me['primitives']:
+                for k in [k for k in pr['attributes'] if (k.startswith('TEXCOORD_') and k != 'TEXCOORD_0') or k.startswith('COLOR_')]: pr['attributes'].pop(k)
+    if '--no-tangents' in a:
+        for me in j.get('meshes', []):
+            for pr in me['primitives']: pr['attributes'].pop('TANGENT', None)
     used = set()
     for an in j.get('animations', []):
         for s in an['samplers']: used |= {s['input'], s['output']}

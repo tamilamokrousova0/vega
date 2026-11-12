@@ -1,5 +1,5 @@
 {
-  "heroSkin": { "file": "vega.glb", "hide": ["Wapon"] },
+  "heroSkin": { "file": "vega.glb", "hide": ["CylinderFloor", "RhinoBodyLow"] },
   "soldier": { "file": "soldier.glb", "height": 1.8, "clips": { "run": "Rifle_run", "idle": "Rifle_stand" } },
   "walker":  { "file": "zombie_hazmat.glb", "height": 1.8, "clips": { "walk": "Zombie_Walk_Root", "idle": "Zombie_Idle" } },
   "spitter": { "file": "zombie_hazmat.glb", "height": 1.8, "clips": { "walk": "Zombie_Walk_Root", "idle": "Zombie_Idle" } },

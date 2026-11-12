@@ -23,19 +23,24 @@ export function makeSkin(holder, driver, scene, opt = {}) {
     if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; if ((opt.hide || []).some(h => o.name.includes(h) || (o.parent && o.parent.name.includes(h)))) o.visible = false; }
   });
   const G_ = n => byName[n], D_ = n => driver.getObjectByName(n);
-  const need = ['DEF-spine', 'DEF-Head', 'DEF-handL', 'DEF-handR', 'DEF-footL', 'DEF-thighL', 'DEF-upper_armL'];
-  const miss = need.filter(n => !G_(n));
-  if (miss.length) throw new Error('в модели нет костей Rigify: ' + miss.join(', '));
+  // тип скелета: Rigify (Blender) или CAT (3ds Max, кости вида «<Имя>Pelvis», «<Имя>LArm11»)
+  let P = null;
+  for (const n in byName) { const m = /^(.*)Pelvis$/.exec(n); if (m && byName[m[1] + 'LArm11'] && byName[m[1] + 'LLeg1']) { P = m[1]; break; } }
+  const cat = P !== null, rigify = !!G_('DEF-spine') && !!G_('DEF-upper_armL');
+  if (!cat && !rigify) throw new Error('скелет не распознан: поддерживаются Rigify и CAT');
+  const N = cat
+    ? { hip: P + 'Pelvis', head: P + 'Head', handL: P + 'LArmPalm', handR: P + 'RArmPalm', footL: P + 'LLegAnkle' }
+    : { hip: 'DEF-spine', head: 'DEF-Head', handL: 'DEF-handL', handR: 'DEF-handR', footL: 'DEF-footL' };
 
   // разворот, рост и уровень пола — по кистям, голове и стопам
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), d = new THREE.Vector3();
   const dl = posH(D_('hand_l'), holder, a).x - posH(D_('hand_r'), holder, b).x;
-  const gl = posH(G_('DEF-handL'), holder, c).x - posH(G_('DEF-handR'), holder, d).x;
+  const gl = posH(G_(N.handL), holder, c).x - posH(G_(N.handR), holder, d).x;
   if (dl * gl < 0) wrap.rotation.y = Math.PI;
   const dh = posH(D_('Head'), holder, a).y - posH(D_('foot_l'), holder, b).y;
-  const gh = posH(G_('DEF-Head'), holder, c).y - posH(G_('DEF-footL'), holder, d).y;
+  const gh = posH(G_(N.head), holder, c).y - posH(G_(N.footL), holder, d).y;
   wrap.scale.setScalar((dh / gh) * (opt.scale || 1));
-  wrap.position.y += posH(D_('foot_l'), holder, a).y - posH(G_('DEF-footL'), holder, b).y;
+  wrap.position.y += posH(D_('foot_l'), holder, a).y - posH(G_(N.footL), holder, b).y;
 
   const pairs = [], syncs = [];
   const dirOf = (from, to, out) => posH(to, holder, out).sub(posH(from, holder, _v)).normalize();
@@ -51,21 +56,36 @@ export function makeSkin(holder, driver, scene, opt = {}) {
     const t = G_(to), f = G_(from); if (!t || !f) return;
     syncs.push({ t, f, K: matH(f, holder, new THREE.Matrix4()).invert().multiply(matH(t, holder, new THREE.Matrix4())), at: pairs.length });
   }
-  pair('DEF-spine', 'pelvis'); pair('DEF-spine001', 'spine_01'); pair('DEF-spine002', 'spine_02'); pair('DEF-spine003', 'spine_03');
-  pair('DEF-NEck', 'neck_01'); pair('DEF-Head', 'Head');
-  sync('ORG-spine', 'DEF-spine'); sync('ORG-spine003', 'DEF-spine003');     // на этих костях висят ноги и руки
-  for (const [S, s] of SIDES) {
-    pair('ORG-shoulder' + S, 'clavicle_' + s, 'DEF-upper_arm' + S, 'upperarm_' + s);
-    pair('DEF-upper_arm' + S, 'upperarm_' + s, 'DEF-forearm' + S, 'lowerarm_' + s);
-    pair('DEF-forearm' + S, 'lowerarm_' + s, 'DEF-hand' + S, 'hand_' + s);
-    pair('DEF-hand' + S, 'hand_' + s, 'DEF-f_middle01' + S, 'middle_01_' + s);
-    sync('ORG-hand' + S, 'DEF-hand' + S);                                    // большие пальцы
-    pair('DEF-thigh' + S, 'thigh_' + s, 'DEF-shin' + S, 'calf_' + s);
-    pair('DEF-shin' + S, 'calf_' + s, 'DEF-foot' + S, 'foot_' + s);
-    pair('DEF-foot' + S, 'foot_' + s, 'DEF-toe' + S, 'ball_' + s);
-    pair('DEF-toe' + S, 'ball_' + s);
+  if (cat) {
+    pair(P + 'Pelvis', 'pelvis'); pair(P + 'Spine1', 'spine_01'); pair(P + 'Spine2', 'spine_02'); pair(P + 'Chest', 'spine_03');
+    pair(P + 'Neck', 'neck_01'); pair(P + 'Head', 'Head');
+    for (const [S, s] of SIDES) {
+      pair(P + S + 'ArmCollarbone', 'clavicle_' + s, P + S + 'Arm11', 'upperarm_' + s);
+      pair(P + S + 'Arm11', 'upperarm_' + s, P + S + 'Arm21', 'lowerarm_' + s);
+      pair(P + S + 'Arm21', 'lowerarm_' + s, P + S + 'ArmPalm', 'hand_' + s);
+      pair(P + S + 'ArmPalm', 'hand_' + s, P + S + 'ArmDigit31', 'middle_01_' + s);
+      pair(P + S + 'Leg1', 'thigh_' + s, P + S + 'Leg21', 'calf_' + s);
+      pair(P + S + 'Leg21', 'calf_' + s, P + S + 'LegAnkle', 'foot_' + s);
+      pair(P + S + 'LegAnkle', 'foot_' + s, P + S + 'LegDigit11', 'ball_' + s);
+      pair(P + S + 'LegDigit11', 'ball_' + s);
+    }
+  } else {
+    pair('DEF-spine', 'pelvis'); pair('DEF-spine001', 'spine_01'); pair('DEF-spine002', 'spine_02'); pair('DEF-spine003', 'spine_03');
+    pair('DEF-NEck', 'neck_01'); pair('DEF-Head', 'Head');
+    sync('ORG-spine', 'DEF-spine'); sync('ORG-spine003', 'DEF-spine003');     // на этих костях висят ноги и руки
+    for (const [S, s] of SIDES) {
+      pair('ORG-shoulder' + S, 'clavicle_' + s, 'DEF-upper_arm' + S, 'upperarm_' + s);
+      pair('DEF-upper_arm' + S, 'upperarm_' + s, 'DEF-forearm' + S, 'lowerarm_' + s);
+      pair('DEF-forearm' + S, 'lowerarm_' + s, 'DEF-hand' + S, 'hand_' + s);
+      pair('DEF-hand' + S, 'hand_' + s, 'DEF-f_middle01' + S, 'middle_01_' + s);
+      sync('ORG-hand' + S, 'DEF-hand' + S);                                    // большие пальцы
+      pair('DEF-thigh' + S, 'thigh_' + s, 'DEF-shin' + S, 'calf_' + s);
+      pair('DEF-shin' + S, 'calf_' + s, 'DEF-foot' + S, 'foot_' + s);
+      pair('DEF-foot' + S, 'foot_' + s, 'DEF-toe' + S, 'ball_' + s);
+      pair('DEF-toe' + S, 'ball_' + s);
+    }
   }
-  const hipG = G_('DEF-spine'), hipD = D_('pelvis');
+  const hipG = G_(N.hip), hipD = D_('pelvis');
   const hipG0 = posH(hipG, holder, new THREE.Vector3()), hipD0 = posH(hipD, holder, new THREE.Vector3());
 
   function applySync(sy) {
