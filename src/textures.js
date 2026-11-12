@@ -2,6 +2,7 @@
 // Цвет вершин задаёт оттенок, текстура — рисунок поверхности, рельеф и неровность блеска.
 import * as THREE from '../vendor/three.module.min.js';
 
+import { fetchAsset } from './assets.js';
 const DIR = 'assets/textures/';
 const NAMES = ['asphalt', 'pavement', 'floor', 'concrete', 'brick', 'metal', 'rust', 'iron', 'rock', 'bark', 'planks', 'sand', 'snow', 'forest', 'fabric', 'leather'];
 export const TEX = {};
@@ -17,7 +18,7 @@ function average(img) {
 // Если файл не загрузился, материал просто остаётся без текстуры.
 export function loadTextures(maxAniso = 4) {
   const loader = new THREE.TextureLoader();
-  return Promise.all(NAMES.map(n => loader.loadAsync(DIR + n + '.jpg').then(t => {
+  return Promise.all(NAMES.map(n => fetchAsset(u => loader.loadAsync(u), DIR + n + '.jpg').then(t => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso;
     t.userData.avg = average(t.image); TEX[n] = t;
   }, () => console.warn('Текстура не загружена:', n))));

@@ -350,7 +350,7 @@ detail(MAT.prop, 'concrete', 3, { own: 0.3, bump: 0.02 });
 initWorld($('c'));
 // скелетные модели: если файлы не загрузились, игра остаётся на процедурных персонажах
 try {
-  await loadActors(k => { startBtn.textContent = `Загрузка… ${Math.round(k * 100)}%`; });
+  await loadActors(k => { startBtn.textContent = k < 1 ? `Загрузка… ${Math.round(k * 100)}%` : 'Загрузка моделей…'; });
 } catch (err) {
   console.warn('Модели не загружены, используются процедурные персонажи:', err);
 }

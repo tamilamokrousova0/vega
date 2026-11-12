@@ -9,6 +9,7 @@ import { P, box, cyl, sph, cone, merge, MAT, weaponMesh, weaponParts, setActorFa
 
 const DIR = 'assets/quaternius/';
 import { makeSkin } from './skin.js';
+import { fetchAsset } from './assets.js';
 const PI = Math.PI, IDENT = new THREE.Matrix4();
 let HERO_SKIN = null;             // модель героини, надеваемая на скелет-манекен (manifest: heroSkin)
 const SEX = {};                // m / f: { geo, armature, names, inverses, idx, gunLocal, head }
@@ -446,7 +447,7 @@ export async function loadActors(onProgress) {
   manP.then(man => { if (man && typeof man === 'object') for (const k of Object.keys(man)) { const e = man[k]; if (k !== 'props' && e && safeFile(e.file)) preload(loader, e.file); } });
   loadCustom.man = manP;
   let done = 0; const step = () => { if (onProgress) onProgress(++done / 3); };
-  const [f, u1, u2] = await Promise.all(['Mannequin_F.glb', 'UAL1.glb', 'UAL2.glb'].map(n => loader.loadAsync(DIR + n).then(g => { step(); return g; })));
+  const [f, u1, u2] = await Promise.all(['Mannequin_F.glb', 'UAL1.glb', 'UAL2.glb'].map(n => fetchAsset(u => loader.loadAsync(u), DIR + n).then(g => { step(); return g; })));
   SEX.f = extract(f); SEX.m = extract(u1);
   SEX.f.geo.userData.sex = 'f'; SEX.m.geo.userData.sex = 'm';
   for (const s of ['m', 'f']) {
@@ -653,7 +654,7 @@ function soloChar(fam, kind, scale, boss) {
 }
 
 const preloaded = {};
-function preload(loader, file) { return preloaded[file] || (preloaded[file] = loader.loadAsync(CUSTOM + file)); }
+function preload(loader, file) { return preloaded[file] || (preloaded[file] = fetchAsset(u => loader.loadAsync(u), CUSTOM + file)); }
 async function loadCustom(loader) {
   const man = await loadCustom.man;
   const fams = {};
