@@ -71,7 +71,7 @@ export function addCorpse(c, pool, x, z, vx, vz, scale = 1) {
   const back = vz <= 0.5 ? 1 : -1;          // падает по направлению удара
   const co = { c, pool, x, z, y: 0, vx, vz, vy: 0, t: 0, dir: (c.root.rotation.y ? back : -back), spin: rand(-1.5, 1.5), scale, mass: scale * scale, down: false, tg: [] };
   for (const l of c.limbs) co.tg.push(rand(-1.4, 1.6), l.lower ? (l.kind === 'leg' ? -rand(0, 1.4) : rand(0, 1.8)) : 0);
-  if (c.actor) { c.actor.die(); co.skinned = true; }     // скелетная модель падает своей анимацией
+  if (c.actor && !c.actor.noDeath) { c.actor.die(); co.skinned = true; }     // скелетная модель падает своей анимацией
   corpses.push(co);
   if (corpses.length > 46) freeCorpse(corpses.shift());
 }

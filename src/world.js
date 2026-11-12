@@ -5,6 +5,7 @@ import { ROAD_HALF } from './config.js';
 import { P, box, cyl, sph, cone, ico, merge, MAT } from './models.js';
 import { fire, steam, sparks, emitGlow, emitSolid } from './fx.js';
 import { setAmbient } from './ambient.js';
+import { customProps } from './actors.js';
 
 const PI = Math.PI, LIGHT = new THREE.Color(0xc8d0d8);
 const W = { props: [], live: [], road: null, ground: null, sun: null, hemi: null, dust: null, dustVel: null, biome: null, sky: null, disc: null, halo: null, back: null, fireLights: [], flash: 0, b: null, wind: 0, fogK: 1, fogKT: 1, tint: 0, tintT: 0 };
@@ -429,6 +430,20 @@ function buildProps(list) {
     o.traverse(m => { if (m.isMesh && m.userData.own) { m.geometry.dispose(); if (m.material.userData.own) m.material.dispose(); } });
   }
   W.props.length = 0; W.live.length = 0;
+  // свои модели окружения из assets/custom/manifest.json заменяют процедурные объекты этого биома
+  const custom = customProps[W.biome];
+  if (custom) {
+    for (const e of custom) for (let i = 0; i < e.count; i++) {
+      const m = new THREE.Group(), inner = e.scene.clone(true);
+      inner.scale.multiplyScalar(e.k); inner.position.y += e.y; m.add(inner);
+      const side = i % 2 ? 1 : -1;
+      m.position.set(side * (e.min + R() * e.spread), 0, -215 + (i + R()) * (240 / e.count));
+      m.rotation.y = e.rot + (side < 0 ? PI : 0) + (e.spin ? R() * 6.28 : 0);
+      m.userData = { own: false, min: e.min, spread: e.spread, side, center: false, recycleZ: 26, sway: 0, ph: 0, fx: null, acc: 0, kids: [], pulse: null, rz: 0 };
+      G.scene.add(m); W.props.push(m);
+    }
+    return;
+  }
   for (const [kind, count] of list) {
     const variants = [];
     for (let v = 0; v < Math.min(4, count); v++) {

@@ -283,6 +283,11 @@ export function updateActors(dt) {
     if (r.t > 2.6) settle(r);
   }
   if (hero) hero.update(dt);
+  for (let i = famDeath.length - 1; i >= 0; i--) {
+    const r = famDeath[i]; if (!r.busy) continue;
+    r.t += dt; r.mixer.update(dt);
+    if (r.t > r.dur + 0.3) famSettle(r);
+  }
   for (let i = bosses.length - 1; i >= 0; i--) { const b = bosses[i]; if (!b.c.root.parent) { bosses.splice(i, 1); continue; } b.update(dt); }
 }
 
@@ -475,6 +480,153 @@ export async function loadActors(onProgress) {
     }
   }
   ready = true; G.dbgActors = { SEX, GEO, PUP, deathRigs };
-  setActorFactory((kind, scale) => kind === 'hero' ? heroChar(scale) : KIND[kind] ? puppetChar(kind, scale) : BOSS_LOOK[kind] ? bossChar(kind, scale) : null);
+  await loadCustom(loader);
+  setActorFactory((kind, scale) => {
+    const fam = FAM[kind];
+    if (fam) return kind === 'hero' || BOSS_LOOK[kind] ? soloChar(fam, kind, scale, kind !== 'hero') : famChar(fam, kind, scale);
+    return kind === 'hero' ? heroChar(scale) : KIND[kind] ? puppetChar(kind, scale) : BOSS_LOOK[kind] ? bossChar(kind, scale) : null;
+  });
   return { head: SEX.f.head, hand: SEX.f.aimHand };
+}
+
+
+// ---------- Свои модели: assets/custom/manifest.json ----------
+// Манифест необязателен. Роль из манифеста подменяет манекен загруженным GLB с его материалами и текстурами.
+const CUSTOM = 'assets/custom/';
+const FAM = {};                    // роль → семейство (исходная сцена, клипы, общие «куклы»)
+const famDeath = [];
+export const customProps = {};     // биом → [{ scene, def }]
+
+const safeFile = f => typeof f === 'string' && !/^[a-z]+:|^\/\/|^\//i.test(f);
+const isUal = root => ['pelvis', 'spine_01', 'hand_r', 'thigh_l', 'Head'].every(n => root.getObjectByName(n));
+// анимации по умолчанию для моделей на скелете Universal Animation Library
+function ualClip(role, key) {
+  if (role === 'hero' || role === 'soldier') return { run: CLIP.sprintAim, idle: CLIP.aimIdle, roll: CLIP.roll, melee: CLIP.melee, death: CLIP.death1 }[key] || null;
+  const z = KIND[role] ? KIND[role].pups : 'walk';
+  if (key === 'walk') return z === 'run' || z === 'flee' ? ANIM.Zombie_Run_Fwd_Loop : z === 'crawl' ? ANIM.Crawl_Fwd_Loop : ANIM.Zombie_Walk_Fwd_Loop;
+  return { idle: ANIM.Zombie_Idle_Loop, run: ANIM.Zombie_Run_Fwd_Loop, death: CLIP.death1, attack: ANIM.Sword_GroundPound }[key] || null;
+}
+
+async function makeFamily(loader, role, e) {
+  if (!safeFile(e.file)) throw new Error('файл должен лежать в assets/custom');
+  const gltf = await loader.loadAsync(CUSTOM + e.file);
+  const src = gltf.scene, meshes = [];
+  src.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  if (!meshes.length) throw new Error('в файле нет сетки со скелетом');
+  src.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(src), h = bb.max.y - bb.min.y;
+  const ual = isUal(src), names = e.clips || {};
+  const clip = key => (names[key] && gltf.animations.find(c => c.name === names[key])) || (ual ? ualClip(role, key) : null);
+  if (!clip('walk') && !clip('run') && !clip('idle')) throw new Error(`нет анимаций: укажите clips (в файле есть: ${gltf.animations.map(c => c.name).join(', ') || 'ничего'}) или используйте скелет UAL`);
+  return { role, src, meshes, k: (h > 0 ? (e.height || 1.8) / h : 1) * (e.scale || 1), y0: -bb.min.y, rot: (e.rotateY ?? 180) * PI / 180, clip, ual, gun: e.gun !== false && ual, live: null, deaths: [], dead: null };
+}
+function famRig(fam, visible) {
+  const root = SkeletonUtils.clone(fam.src), sk = [];
+  root.traverse(o => { if (o.isSkinnedMesh) sk.push(o.skeleton); if (o.isMesh && !visible) o.visible = false; });
+  return { root, sk, mixer: new THREE.AnimationMixer(root), fam };
+}
+const famBind = (a, rig) => a.meshes.forEach((m, i) => m.bind(rig.sk[i], a.fam.meshes[i].bindMatrix));
+function famSettle(rig) {
+  for (const a of rig.users) { famBind(a, rig.fam.dead); a.rig = null; }
+  rig.users.length = 0; rig.busy = false;
+}
+function famHolder(c, fam) { c.holder.rotation.y = fam.rot; c.holder.scale.setScalar(fam.k); c.holder.position.y = fam.y0 * fam.k; }
+
+// бойцы и рядовые заражённые: сетки каждого экземпляра привязаны к нескольким общим скелетам
+function famChar(fam, kind, scale) {
+  if (!fam.live) {
+    const move = fam.clip('walk') || fam.clip('run') || fam.clip('idle'), idle = fam.clip('idle'), death = fam.clip('death');
+    fam.live = [0, 0.25, 0.5, 0.75].map(ph => {
+      const r = famRig(fam, false);
+      r.actions = [move].concat(kind === 'soldier' && idle ? [idle] : []).map(cl => { const a = r.mixer.clipAction(cl); a.play(); a.time = ph * cl.duration; return a; });
+      if (r.actions.length > 1) { r.actions[1].setEffectiveWeight(0); r.blend = true; }
+      G.scene.add(r.root); puppets.push(r); return r;
+    });
+    if (death) {
+      fam.dead = famRig(fam, false); const a = fam.dead.mixer.clipAction(death); a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; a.play(); fam.dead.mixer.update(death.duration + 0.1); G.scene.add(fam.dead.root);
+      for (let i = 0; i < 8; i++) { const r = famRig(fam, false); r.users = []; r.busy = false; r.t = 0; r.dur = death.duration; r.action = r.mixer.clipAction(death); r.action.setLoop(THREE.LoopOnce); r.action.clampWhenFinished = true; G.scene.add(r.root); fam.deaths.push(r); famDeath.push(r); }
+    }
+  }
+  const c = charBase(kind, scale); famHolder(c, fam);
+  const a = c.actor = { fam, meshes: [], live: fam.live[counter++ % fam.live.length], dead: false, rig: null, noDeath: !fam.dead };
+  fam.meshes.forEach(m => { const sm = new THREE.SkinnedMesh(m.geometry, m.material); sm.bindMode = THREE.DetachedBindMode; sm.castShadow = true; sm.frustumCulled = false; c.holder.add(sm); a.meshes.push(sm); });
+  famBind(a, a.live);
+  a.anim = () => { if (a.dead) { a.dead = false; if (a.rig) { const i = a.rig.users.indexOf(a); if (i >= 0) a.rig.users.splice(i, 1); a.rig = null; } famBind(a, a.live); } };
+  a.die = () => {
+    if (a.dead || a.noDeath) return; a.dead = true;
+    let rig = fam.deaths.find(r => !r.busy);
+    if (!rig) { rig = fam.deaths.reduce((m, r) => r.t > m.t ? r : m, fam.deaths[0]); famSettle(rig); }
+    rig.busy = true; rig.t = 0; rig.action.reset(); rig.action.play();
+    rig.users.push(a); a.rig = rig; famBind(a, rig);
+  };
+  return c;
+}
+
+// Вега и боссы: собственная копия модели со своим микшером
+function soloChar(fam, kind, scale, boss) {
+  const c = charBase(kind, scale * (boss ? 1 : 0.9)); famHolder(c, fam);
+  const rig = famRig(fam, true); c.holder.add(rig.root);
+  const act = {}, w = {};
+  for (const key of ['run', 'walk', 'idle', 'roll', 'melee', 'death', 'attack']) {
+    const cl = fam.clip(key); if (!cl) continue;
+    const a = rig.mixer.clipAction(cl);
+    if (key === 'roll' || key === 'melee' || key === 'death' || key === 'attack') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+    a.play(); a.setEffectiveWeight(0); act[key] = a; w[key] = 0;
+  }
+  const move = act.run ? 'run' : act.walk ? 'walk' : 'idle', rest = act.idle ? 'idle' : move;
+  let gunHolder = null;
+  if (!boss && fam.gun) { const hand = rig.root.getObjectByName('hand_r'); if (hand) { gunHolder = new THREE.Group(); hand.add(gunHolder); gunHolder.matrixAutoUpdate = false; gunHolder.matrix.copy(SEX.f.gunLocal); } }
+  const a = c.actor = { c, k: 0, st: { roll: -1, melee: false, dead: false }, was: {}, atkT: 0, dead: false };
+  a.anim = (t, k) => { a.k = k; };
+  a.setGun = tier => { if (!gunHolder) return; if (c.gun) gunHolder.remove(c.gun); c.gun = weaponMesh(tier); c.gun.scale.multiplyScalar(1 / fam.k); gunHolder.add(c.gun); };
+  a.state = (roll, melee, dead) => { a.st.roll = roll; a.st.melee = melee; a.st.dead = dead; };
+  a.attack = () => { if (act.attack) { act.attack.reset(); act.attack.play(); a.atkT = act.attack.getClip().duration; } };
+  a.die = () => { a.st.dead = true; };
+  a.update = dt => {
+    const s = a.st, tgt = {}; for (const n in w) tgt[n] = 0;
+    const once = (key, on, wasOn) => { if (on && !wasOn) { act[key].reset(); act[key].play(); } };
+    if (s.dead && act.death) { tgt.death = 1; once('death', true, a.was.dead); }
+    else if (s.roll >= 0 && act.roll) { tgt.roll = 1; once('roll', true, a.was.roll >= 0); act.roll.paused = true; act.roll.time = s.roll * act.roll.getClip().duration * 0.8; }
+    else if (s.melee && act.melee) { tgt.melee = 1; once('melee', true, a.was.melee); }
+    else if (a.atkT > 0 && act.attack) { a.atkT -= dt; tgt.attack = 1; }
+    else if (boss) { if (a.k > 1.05 && act.run) tgt.run = 1; else { tgt[act.walk ? 'walk' : move] = 0.5; tgt[rest] = (tgt[rest] || 0) + 0.5; } }
+    else { const k = Math.min(1, a.k); tgt[move] = k; tgt[rest] = (tgt[rest] || 0) + 1 - k; }
+    a.was = { roll: s.roll, melee: s.melee, dead: s.dead };
+    const kk = Math.min(1, dt * 12);
+    for (const n in w) { w[n] += (tgt[n] - w[n]) * kk; act[n].setEffectiveWeight(w[n]); }
+    rig.mixer.update(dt);
+  };
+  if (boss) bosses.push(a); else hero = a;
+  return c;
+}
+
+async function loadCustom(loader) {
+  let man;
+  try { const r = await fetch(CUSTOM + 'manifest.json', { cache: 'no-store' }); if (!r.ok) return; man = await r.json(); } catch (e) { return; }
+  if (!man || typeof man !== 'object') return;
+  for (const role of Object.keys(man)) {
+    const e = man[role];
+    if (role === 'props' || !e || typeof e !== 'object') continue;
+    if (role !== 'hero' && !KIND[role] && !BOSS_LOOK[role]) { console.warn(`manifest.json: неизвестная роль «${role}»`); continue; }
+    try { FAM[role] = await makeFamily(loader, role, e); console.info(`Своя модель подключена: ${role} ← ${e.file}`); }
+    catch (err) { console.warn(`Модель «${role}» не подключена, остаётся манекен:`, err.message || err); }
+  }
+  const props = man.props && typeof man.props === 'object' ? man.props : {};
+  for (const biome of Object.keys(props)) {
+    const list = [];
+    for (const e of Array.isArray(props[biome]) ? props[biome] : []) {
+      try {
+        if (!e || !safeFile(e.file)) throw new Error('файл должен лежать в assets/custom');
+        const g = await loader.loadAsync(CUSTOM + e.file), scene = g.scene;
+        let skinned = false;
+        scene.traverse(o => { if (o.isSkinnedMesh) skinned = true; if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        if (skinned) throw new Error('декорация должна быть статичной моделью без скелета');
+        scene.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(scene), h = bb.max.y - bb.min.y;
+        const k = (e.height && h > 0 ? e.height / h : 1) * (e.scale || 1);
+        list.push({ scene, k, y: -bb.min.y * k + (e.y || 0), min: e.min ?? 9, spread: e.spread ?? 10, count: Math.max(1, Math.min(60, e.count | 0 || 8)), rot: (e.rotateY || 0) * PI / 180, spin: !!e.randomRotation });
+      } catch (err) { console.warn(`Декорация «${e && e.file}» (${biome}) не подключена:`, err.message || err); }
+    }
+    if (list.length) customProps[biome] = list;
+  }
 }

@@ -60,7 +60,7 @@ export const SEGMENTS = {
   avenue:    { name: 'Проспект',      verb: 'Огонь',       k: 1.0,  crate: 11, wall: 12 },
   narrow:    { name: 'Узкое место',   verb: 'Уклонение',   k: 0.8,  heavy: 1, sides: 5.5 },
   barricade: { name: 'Баррикада',     verb: 'Оборона',     k: 1.5,  heavy: 1, stop: 1, dur: 26 },
-  ambush:    { name: 'Засада',        verb: 'Ближний бой', k: 1.0,  heavy: 1, close: 1 },
+  ambush:    { name: 'Засада',        verb: 'Ближний бой', k: 1.25, heavy: 1, close: 1 },
   gates:     { name: 'Склад',         verb: 'Трофеи',      k: 0.5,  crate: 4,  wall: 8 },
   rescue:    { name: 'Спасение',      verb: 'Риск',        k: 0.8,  cages: 3, crate: 15 },
   panic:     { name: 'Паника',        verb: 'Всё сразу',   k: 1.2,  heavy: 1, force: 'runner' },

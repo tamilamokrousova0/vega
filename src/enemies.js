@@ -24,7 +24,6 @@ export function spawnEnemy(type, x, z, opt = {}) {
   };
   const bs = c.root.userData.bs || (c.root.userData.bs = c.root.scale.x);
   c.root.scale.setScalar(bs);
-  if (opt.rise) { e.rise = 0.55; c.root.scale.y = bs * 0.05; dustBurst(x, z, 2); }    // вылезает из земли
   c.root.position.set(x, 0, z);
   G.enemies.push(e);
   return e;
@@ -127,14 +126,14 @@ export function updateEnemies(dt) {
       continue;
     }
     e.t += dt;
-    if (e.rise > 0) { e.rise -= dt; const bs = e.c.root.userData.bs; e.c.root.scale.y = bs * Math.min(1, 1.05 - Math.max(0, e.rise) / 0.55); }
     if (e.flee) {                             // золотой зомби убегает от отряда
       e.z -= 1.6 * dt; e.x += Math.sin(e.t * 1.7) * 2.2 * dt;
       e.c.root.position.set(e.x, 0, e.z); e.c.root.rotation.y = 0; animChar(e.c, e.t * 9, 1);
       if (e.z < -72) { e.alive = false; release(e); }
       continue;
     }
-    e.z += (G.scroll + e.speed) * dt;
+    // вдали враг всегда сближается не медленнее 13 м/с — даже когда отряд стоит (баррикада, босс)
+    e.z += (G.scroll + e.speed + (e.z < -34 ? Math.max(0, 13 - G.scroll - e.speed) : 0)) * dt;
     if (e.kx || e.kz) {                       // отбрасывание от попаданий и взрывов
       e.x += e.kx * dt; e.z += e.kz * dt;
       const f = Math.max(0, 1 - dt * 7); e.kx *= f; e.kz *= f;

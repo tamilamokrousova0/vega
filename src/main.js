@@ -9,7 +9,7 @@ import { updateEnemies, updateZones, clearEnemies, aoe } from './enemies.js';
 import { initWeapons, updateWeapons, clearProjectiles } from './weapons.js';
 import { updateGates, clearGates } from './gates.js';
 import { updateBoss, bossKilled, removeBoss } from './boss.js';
-import { save, loadSave, persist, rank, renderArsenal } from './arsenal.js';
+import { save, loadSave, persist, rank, renderArsenal, cleanName } from './arsenal.js';
 import { sfx } from './audio.js';
 import { initPhysics, updatePhysics, clearPhysics } from './physics.js';
 import { initAmbient, updateAmbient } from './ambient.js';
@@ -96,7 +96,9 @@ function boardRows(el, title, mark) {
   const h = document.createElement('h4'); h.textContent = title; el.appendChild(h);
   save.board.forEach((r, i) => {
     const d = document.createElement('div'); if (r === mark) d.className = 'me';
-    d.textContent = `${i + 1}. ${r.world} · ${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}`;
+    const who = document.createElement('span'); who.textContent = `${i + 1}. ${r.name || 'Без имени'}`;
+    d.appendChild(who);
+    d.appendChild(document.createTextNode(` · ${r.world} · ${Math.floor(r.time / 60)}:${String(Math.floor(r.time % 60)).padStart(2, '0')}`));
     const b = document.createElement('b'); b.textContent = fmt(r.score); d.appendChild(b); el.appendChild(d);
   });
 }
@@ -109,15 +111,16 @@ function showResult() {
   let mine = null;
   if (!r.practice) {
     if (r.entry) save.board.splice(save.board.indexOf(r.entry), 1);
-    mine = r.entry = { score: Math.floor(r.score), world: w.name.split(' — ')[0], time: r.time, date: Date.now() };
+    mine = r.entry = { name: save.name, score: Math.floor(r.score), world: w.name.split(' — ')[0], time: r.time, date: Date.now() };
     save.board.push(mine); save.board.sort((a, b) => b.score - a.score); save.board = save.board.slice(0, 10);
   }
   persist();
   const place = mine ? save.board.indexOf(mine) : -1;
   $('resTitle').textContent = 'Вега пала';
-  $('resSub').textContent = r.practice ? `Тренировка: ${w.name}. В лидерборд не идёт.`
+  const who = save.name ? `Позывной: ${save.name}. ` : '';
+  $('resSub').textContent = who + (r.practice ? `Тренировка: ${w.name}. В таблицу не идёт.`
     : place === 0 ? 'Новый рекорд. Линия держалась дольше, чем когда-либо.'
-    : place > 0 ? `Место в лидерборде: ${place + 1}.` : 'В десятку лучших забег не попал.';
+    : place > 0 ? `Место в таблице: ${place + 1}.` : 'В десятку лучших забег не попал.');
   const st = $('resStats'); st.innerHTML = '';
   const row = (k, v) => { const d = document.createElement('div'); d.textContent = k; const b = document.createElement('b'); b.textContent = v; d.appendChild(b); st.appendChild(d); };
   row('Очки', fmt(r.score));
@@ -159,12 +162,29 @@ function toMenu() {
   cont.textContent = `Тренировка: ${WORLDS[wi].name.split(' — ')[0]} · без рекорда`;
   $('btnUltPick').textContent = 'Ульта: ' + ULT[save.ult];
   boardRows($('menuBoard'), 'Лучшие забеги', null);
+  nickEl.value = save.name; syncNick();
 }
+
+// ---------- Позывной ----------
+const nickEl = $('nick');
+function syncNick() {
+  const ok = cleanName(nickEl.value).length >= 2;
+  $('btnStart').disabled = !ok; $('btnContinue').disabled = !ok;
+  return ok;
+}
+function commitNick() {
+  if (!syncNick()) { nickEl.focus(); return false; }
+  save.name = cleanName(nickEl.value); nickEl.value = save.name; persist(); nickEl.blur();
+  return true;
+}
+nickEl.addEventListener('input', syncNick);
+nickEl.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && commitNick()) { sfx.init(); startRun(0, false); } });
+nickEl.addEventListener('keyup', e => e.stopPropagation());
 
 // ---------- Кнопки ----------
 function bind(id, fn) { $(id).addEventListener('click', () => { sfx.init(); sfx.click(); fn(); }); }
-bind('btnStart', () => startRun(0, false));
-bind('btnContinue', () => startRun(Math.min(save.cleared, WORLDS.length - 1), true));
+bind('btnStart', () => { if (commitNick()) startRun(0, false); });
+bind('btnContinue', () => { if (commitNick()) startRun(Math.min(save.cleared, WORLDS.length - 1), true); });
 bind('btnUltPick', () => { save.ult = save.ult === 'air' ? 'cry' : 'air'; persist(); $('btnUltPick').textContent = 'Ульта: ' + ULT[save.ult]; });
 bind('btnArsenal', () => openArsenal('menu'));
 bind('resArsenal', () => openArsenal('result'));
@@ -328,6 +348,7 @@ G.god = params.get('god') === '1';
 toMenu();
 camPos.set(-1.1, 1.5, -3.1); camLook.set(0.85, 1.15, 0);
 if (params.has('world')) {
+  if (!save.name) save.name = 'Тест';
   const wi = Math.max(1, parseInt(params.get('world'), 10) || 1) - 1;
   startRun(wi, true);
   if (params.has('tier')) setWeapon(clamp(parseInt(params.get('tier'), 10) || 0, 0, 5));

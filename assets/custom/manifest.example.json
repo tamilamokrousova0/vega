@@ -1,0 +1,13 @@
+{
+  "hero":    { "file": "vega.glb", "height": 1.8, "rotateY": 180,
+               "clips": { "run": "Run", "idle": "Idle", "roll": "Roll", "melee": "Punch", "death": "Death" } },
+  "soldier": { "file": "soldier.glb", "clips": { "run": "Run", "idle": "Idle", "death": "Death" } },
+  "walker":  { "file": "zombie_a.glb", "clips": { "walk": "Walk", "death": "Death" } },
+  "runner":  { "file": "zombie_runner.glb", "clips": { "walk": "Run", "death": "Death" } },
+  "butcher": { "file": "boss_butcher.glb", "clips": { "walk": "Walk", "idle": "Idle", "run": "Run", "attack": "Attack", "death": "Death" } },
+  "props": {
+    "city":   [ { "file": "building_01.glb", "height": 18, "min": 16, "spread": 12, "count": 10 },
+                { "file": "car_wreck.glb", "height": 1.5, "min": 7, "spread": 4, "count": 8, "randomRotation": true } ],
+    "desert": [ { "file": "rock_01.glb", "height": 3, "min": 8, "spread": 20, "count": 16, "randomRotation": true } ]
+  }
+}

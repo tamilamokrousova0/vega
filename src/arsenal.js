@@ -3,7 +3,9 @@ import { ARSENAL } from './config.js';
 import { sfx } from './audio.js';
 
 const KEY = 'vega.save.v1';
-export const save = { tokens: 0, cleared: 0, items: {}, board: [], ult: 'air' };
+export const save = { tokens: 0, cleared: 0, items: {}, board: [], ult: 'air', name: '' };
+// позывной: 2–16 символов, без управляющих знаков
+export const cleanName = v => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 16);
 
 export function loadSave() {
   try {
@@ -13,6 +15,8 @@ export function loadSave() {
       save.items = (s.items && typeof s.items === 'object') ? s.items : {};
       save.board = Array.isArray(s.board) ? s.board.filter(r => r && typeof r.score === 'number').slice(0, 10) : [];
       save.ult = s.ult === 'cry' ? 'cry' : 'air';
+      save.name = cleanName(s.name);
+      for (const r of save.board) r.name = cleanName(r.name);
     }
   } catch (e) { /* повреждённое сохранение — начинаем с нуля */ }
 }

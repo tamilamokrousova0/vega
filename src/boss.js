@@ -28,7 +28,8 @@ export function removeBoss() {
 }
 
 function minions(b, type, n, fast) {
-  for (let i = 0; i < n; i++) spawnEnemy(type, clamp(b.e.x + rand(-4, 4), -4.8, 4.8), b.e.z - rand(1, 7), { fast, rise: 1 });
+  // подкрепление приходит издалека, из-за спины босса
+  for (let i = 0; i < n; i++) spawnEnemy(type, rand(-4.8, 4.8), b.e.z - rand(55, 85), { fast });
 }
 
 function attack(b, name) {

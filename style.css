@@ -115,3 +115,11 @@ h1 small { display: block; font-size: 26px; letter-spacing: .34em; color: #9aa37
 }
 
 .toast.radio { font-size: 19px; letter-spacing: .05em; text-transform: none; color: #b9c2a8; max-width: 80vw; text-align: center; animation-duration: 5s; }
+
+/* --- позывной игрока --- */
+.nick { display: block; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: #8d927f; margin-bottom: 10px; }
+.nick input { display: block; width: 100%; margin-top: 5px; padding: 10px 12px; font: inherit; font-size: 20px; letter-spacing: .06em; text-transform: none;
+  color: #f2efe6; background: rgba(20,23,22,.9); border: 1px solid #4b5345; outline: none; -webkit-user-select: text; user-select: text; }
+.nick input:focus { border-color: #9aa37c; }
+.nick input::placeholder { color: #5f6457; font-size: 16px; }
+.board div span { color: #d8d5cc; margin-right: 4px; }

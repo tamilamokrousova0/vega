@@ -7,8 +7,8 @@ import { spawnCrate, spawnCage, spawnMed, spawnBarrel, spawnBarricade } from './
 import { spawnBoss } from './boss.js';
 import { addSoldiers } from './player.js';
 import { upgradeWeapon, airstrike } from './weapons.js';
-import { toast, dustBurst } from './fx.js';
-import { setMood } from './world.js';
+import { toast } from './fx.js';
+import { setMood, worldInfo } from './world.js';
 import { rank } from './arsenal.js';
 import { sfx } from './audio.js';
 
@@ -139,29 +139,20 @@ function pickType(def) {
   const w = worldDef(G.run.world);
   if (def.force) return def.force;
   let mix = w.mix;
-  if (def.close) mix = mix.filter(m => m[0] === 'walker' || m[0] === 'runner' || m[0] === 'crawler');
+  // «Засада» — быстрая волна: в основном бегуны и ползуны
+  if (def.close) mix = [['runner', 3], ['walker', 1]].concat(mix.some(m => m[0] === 'crawler') ? [['crawler', 2]] : []);
   let total = 0; for (const m of mix) total += m[1];
   let x = Math.random() * total;
   for (const m of mix) { x -= m[1]; if (x <= 0) return m[0]; }
   return 'walker';
 }
 
-function spawnGroup(def, rateK) {
+// Враги не возникают рядом: каждый появляется поодиночке далеко в дымке и бежит на отряд
+function spawnOne(def, rateK) {
   const r = G.run, type = pickType(def), ed = ENEMIES[type];
-  let n = ed.group[0] + (Math.random() * (ed.group[1] - ed.group[0] + 1) | 0);
-  const cost = n * ed.cost;
-  r.spawnT += cost / (r.rate * rateK);
-  if (def.close) {                         // из люков и с обочин, вплотную
-    const side = Math.random() < 0.5 ? -1 : 1, z0 = rand(-30, -20);
-    dustBurst(side * 4.6, z0, 6);
-    for (let k = 0; k < n; k++) spawnEnemy(type, side * rand(3.6, 4.9), z0 - rand(0, 4), { hpK: r.hpK, rise: 1 });
-  } else if (def.stop) {
-    const cx = rand(-4, 4);
-    for (let k = 0; k < n; k++) spawnEnemy(type, clamp(cx + rand(-1.9, 1.9), -4.9, 4.9), -40 - rand(0, 8), { fast: 2.2, hpK: r.hpK, rise: 1 });
-  } else {
-    const cx = rand(-4, 4);
-    for (let k = 0; k < n; k++) spawnEnemy(type, clamp(cx + rand(-1.9, 1.9), -4.9, 4.9), -56 - rand(0, 9), { hpK: r.hpK, rise: 1 });
-  }
+  r.spawnT += ed.cost / (r.rate * rateK);
+  const far = Math.min(worldInfo.b ? worldInfo.b.far * 0.95 : 100, 105);
+  spawnEnemy(type, rand(-4.9, 4.9), -(far + rand(2, 24)), { hpK: r.hpK });
 }
 
 function updateSegment(dt) {
@@ -170,7 +161,7 @@ function updateSegment(dt) {
   const blood = r.event === 'blood' ? 2 : 1;
   r.spawnT -= dt;
   let guard = 0;
-  while (r.spawnT <= 0 && G.enemies.length < 240 && guard++ < 8) spawnGroup(def, blood);
+  while (r.spawnT <= 0 && G.enemies.length < 240 && guard++ < 12) spawnOne(def, blood);
   if (r.spawnT < -2) r.spawnT = 0;
   if (moving) {
     if ((r.gateT -= dt) <= 0) { r.gateT = def.crate * rand(0.8, 1.25); spawnCrate(rand(-4, 4), -66); }
@@ -197,7 +188,7 @@ function startMini() {
   r.phase = 'mini'; r.t = 0; r.def = SEGMENTS.avenue; r.type = 'mini';
   r.rate = THREAT * 40 * Math.pow(1 + 0.09 * r.seg, 1.4) * Math.pow(1.35, r.cycle - 1) * 0.3 / SEG_DUR; r.spawnT = 2;
   r.hpK = threatHp(r.rate, 0.6);
-  const e = spawnEnemy('brute', 0, -66, { hpK: Math.max((1 + 0.35 * r.wave) * Math.pow(1.35, r.cycle - 1), squadPower() * 9 / (1500 * G.hpMul())) });
+  const e = spawnEnemy('brute', 0, -(Math.min(worldInfo.b ? worldInfo.b.far * 0.95 : 100, 105) + 6), { hpK: Math.max((1 + 0.35 * r.wave) * Math.pow(1.35, r.cycle - 1), squadPower() * 9 / (1500 * G.hpMul())) });
   G.elite = e; r.eliteRef = e;
   toast('Мини-босс: Громила', 'big'); sfx.roar();
 }
@@ -289,7 +280,8 @@ export function updateRun(dt) {
   if (r.phase === 'seg') updateSegment(dt);
   else if (r.phase === 'mini') {
     r.t += dt; r.spawnT -= dt;
-    if (r.spawnT <= 0 && G.enemies.length < 200) spawnGroup(SEGMENTS.avenue, 1);
+    let guard = 0;
+    while (r.spawnT <= 0 && G.enemies.length < 200 && guard++ < 8) spawnOne(SEGMENTS.avenue, 1);
     const e = r.eliteRef;
     if (!e || !e.alive) {
       if (e && e.hp <= 0) { addScore(10000 * r.cycle); toast('Мини-босс уничтожен', 'good'); }
