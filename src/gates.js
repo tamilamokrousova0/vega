@@ -175,7 +175,7 @@ export function chargeGates(pz, nz, x, amount) {
 function pickup(type, geo, x, z, hp, r, labelTex, h = 1.5) {
   geos();
   const root = new THREE.Group();
-  const m = new THREE.Mesh(geo, MAT.prop); m.castShadow = true; root.add(m);
+  const m = new THREE.Mesh(geo, MAT.wood); m.castShadow = true; root.add(m);
   const bar = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0xd8d5cc, fog: false })); bar.position.set(0, h, 0); root.add(bar);
   const back = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0x15171a, fog: false })); back.position.set(0, h, -0.01); back.scale.set(1.04, 1.5, 1); root.add(back);
   const txt = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false, fog: false })); txt.position.set(0, h + 0.6, 0); root.add(txt);
@@ -192,7 +192,7 @@ export function spawnMed(x, z) { geos(); pickup('med', medGeo, x, z, pickHp(60),
 
 export function spawnBarrel(x, z) {
   geos();
-  const root = new THREE.Mesh(barrelGeo, MAT.prop); root.castShadow = true;
+  const root = new THREE.Mesh(barrelGeo, MAT.drum); root.castShadow = true;
   root.position.set(x, 0, z); G.scene.add(root);
   const hp = 35 * G.hpMul();
   G.enemies.push({ type: 'barrel', static: true, c: { root }, pool: null, x, z, r: 0.55, h: 1, hp, maxHp: hp, alive: true });

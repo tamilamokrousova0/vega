@@ -14,6 +14,8 @@ import { sfx } from './audio.js';
 import { initPhysics, updatePhysics, clearPhysics } from './physics.js';
 import { initAmbient, updateAmbient } from './ambient.js';
 import { loadActors, updateActors } from './actors.js';
+import { loadTextures, detail } from './textures.js';
+import { MAT } from './models.js';
 import { newRun, updateRun, bindRunHooks, chooseUpgrade, useUlt, worldDef, comboMul, bossDefeated, startBoss } from './run.js';
 
 const $ = id => document.getElementById(id);
@@ -153,7 +155,7 @@ function revive() {
 function toMenu() {
   G.mode = 'menu'; G.scrollTarget = 0; G.paused = false; G.resting = false; G.timeScale = 1; G.defend = false;
   clearEnemies(); clearGates(); removeBoss(); clearProjectiles(); clearPhysics();
-  pendingFn = null; G.run = null; G.elite = null; G.formation = 'square'; fadeT = 0; ui.fade.style.opacity = 0;
+  pendingFn = null; G.run = null; G.narrow = false; G.elite = null; G.formation = 'square'; fadeT = 0; ui.fade.style.opacity = 0;
   resetSquad(0); setWeapon(0);
   setBiome(WORLDS[Math.min(save.cleared, WORLDS.length - 1)].biome);
   show(ui.hud, false); show(ui.result, false); show(ui.arsenal, false); show(ui.pause, false); show(ui.rest, false); show(ui.menu, true);
@@ -167,8 +169,9 @@ function toMenu() {
 
 // ---------- Позывной ----------
 const nickEl = $('nick');
+let gameReady = false;             // пока модели грузятся, забег запускать нельзя
 function syncNick() {
-  const ok = cleanName(nickEl.value).length >= 2;
+  const ok = gameReady && cleanName(nickEl.value).length >= 2;
   $('btnStart').disabled = !ok; $('btnContinue').disabled = !ok;
   return ok;
 }
@@ -178,7 +181,7 @@ function commitNick() {
   return true;
 }
 nickEl.addEventListener('input', syncNick);
-nickEl.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && commitNick()) { sfx.init(); startRun(0, false); } });
+nickEl.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && gameReady && commitNick()) { sfx.init(); startRun(0, false); } });
 nickEl.addEventListener('keyup', e => e.stopPropagation());
 
 // ---------- Кнопки ----------
@@ -333,10 +336,21 @@ window.__step = (sec, auto = true) => {
 
 // ---------- Запуск ----------
 loadSave();
+const startBtn = $('btnStart'), startLabel = startBtn.textContent;
+syncNick(); startBtn.textContent = 'Загрузка…';
+await loadTextures();
+// ткань, кожа, металл и дерево для персонажей, оружия и предметов
+detail(MAT.char, 'fabric', 0.45, { own: 0, amt: 0.75, bump: 0.004, rough: 0.2 });
+detail(MAT.suit, 'leather', 0.6, { own: 0, amt: 0.8, bump: 0.005, rough: 0.3 });
+detail(MAT.gun, 'metal', 0.7, { own: 0, amt: 0.7, bump: 0.003, rough: 0.35 });
+detail(MAT.steel, 'metal', 0.7, { own: 0, amt: 0.7, bump: 0.003, rough: 0.35 });
+detail(MAT.wood, 'planks', 1.3, { own: 0.45, bump: 0.012 });
+detail(MAT.drum, 'rust', 1.6, { own: 0.4, bump: 0.008 });
+detail(MAT.prop, 'concrete', 3, { own: 0.3, bump: 0.02 });
 initWorld($('c'));
 // скелетные модели: если файлы не загрузились, игра остаётся на процедурных персонажах
 try {
-  await loadActors();
+  await loadActors(k => { startBtn.textContent = `Загрузка… ${Math.round(k * 100)}%`; });
 } catch (err) {
   console.warn('Модели не загружены, используются процедурные персонажи:', err);
 }
@@ -345,6 +359,7 @@ menuLight = new THREE.PointLight(0xfff0e0, 0, 12, 1.6); G.scene.add(menuLight);
 setFxScale(window.innerHeight);
 window.addEventListener('resize', () => setFxScale(window.innerHeight));
 G.god = params.get('god') === '1';
+gameReady = true; startBtn.textContent = startLabel;
 toMenu();
 camPos.set(-1.1, 1.5, -3.1); camLook.set(0.85, 1.15, 0);
 if (params.has('world')) {

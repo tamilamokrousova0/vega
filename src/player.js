@@ -56,6 +56,7 @@ function slot(i, out) {
   const p = SLOTS[i % SLOTS.length];
   out.x = p[0]; out.z = p[1];
   if (G.defend) { out.x *= 0.6; out.z = 0.3 + (out.z - 0.3) * 0.7; }
+  if (G.narrow) { out.z += Math.abs(out.x) * 0.55; out.x *= 0.5; }      // узкое место: отряд сжимается в клин
   return out;
 }
 const _slot = { x: 0, z: 0 };

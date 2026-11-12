@@ -19,7 +19,7 @@ export const ENEMIES = {
   crawler:  { name: 'Паразит',  cost: 1,  hp: 11,   speed: 5.0, r: 0.42, dmg: 6,  bites: 1, scale: 1.0,  steer: 2.5, group: [5, 8] },
   spitter:  { name: 'Плевака',  cost: 4,  hp: 48,   speed: 1.0, r: 0.5,  dmg: 10, bites: 1, scale: 1.1,  steer: 1.0, group: [1, 2] },
   exploder: { name: 'Раздутый', cost: 4,  hp: 40,   speed: 3.5, r: 0.5,  dmg: 20, bites: 1, scale: 1.1,  steer: 2.0, group: [1, 2], explode: 2.8 },
-  fat:      { name: 'Таран',    cost: 8,  hp: 190,  speed: 1.4, r: 0.8,  dmg: 30, bites: 3, scale: 1.55, steer: 1.0, group: [1, 1] },
+  fat:      { name: 'Таран',    cost: 8,  hp: 190,  speed: 1.4, r: 0.8,  dmg: 30, bites: 3, scale: 1.55, steer: 1.0, group: [1, 1], explode: 3.6 },
   brute:    { name: 'Громила',  cost: 25, hp: 1500, speed: 1.3, r: 1.15, dmg: 22, bites: 6, scale: 2.3,  steer: 1.2, group: [1, 1], model: 'fat', elite: true },
   gold:     { name: 'Золотой зомби', cost: 300, hp: 500, speed: 0, r: 0.5, dmg: 0, bites: 1, scale: 1.05, steer: 0, group: [1, 1], flee: true },
 };
@@ -58,7 +58,7 @@ export const BOSSES = {
 // Типы сегментов (30 с). k — доля бюджета угрозы; heavy — «тяжёлый» сегмент
 export const SEGMENTS = {
   avenue:    { name: 'Проспект',      verb: 'Огонь',       k: 1.0,  crate: 11, wall: 12 },
-  narrow:    { name: 'Узкое место',   verb: 'Уклонение',   k: 0.8,  heavy: 1, sides: 5.5 },
+  narrow:    { name: 'Узкое место',   verb: 'Уклонение',   k: 0.8,  heavy: 1, sides: 1.1 },
   barricade: { name: 'Баррикада',     verb: 'Оборона',     k: 1.5,  heavy: 1, stop: 1, dur: 26 },
   ambush:    { name: 'Засада',        verb: 'Ближний бой', k: 1.25, heavy: 1, close: 1 },
   gates:     { name: 'Склад',         verb: 'Трофеи',      k: 0.5,  crate: 4,  wall: 8 },

@@ -8,7 +8,9 @@ import { G } from './state.js';
 import { P, box, cyl, sph, cone, merge, MAT, weaponMesh, weaponParts, setActorFactory } from './models.js';
 
 const DIR = 'assets/quaternius/';
+import { makeSkin } from './skin.js';
 const PI = Math.PI, IDENT = new THREE.Matrix4();
+let HERO_SKIN = null;             // модель героини, надеваемая на скелет-манекен (manifest: heroSkin)
 const SEX = {};                // m / f: { geo, armature, names, inverses, idx, gunLocal, head }
 const CLIP = {};
 const PUP = {};                // наборы кукол
@@ -266,6 +268,14 @@ function heroChar(scale) {
     act.roll.paused = true;
     rig.mixer.update(dt);
   };
+  if (HERO_SKIN) {
+    try {
+      const skin = makeSkin(c.holder, rig.root, HERO_SKIN.scene, HERO_SKIN);
+      mesh.visible = false;
+      const upd = a.update; a.update = dt => { upd(dt); skin.update(); };
+      skin.update();
+    } catch (err) { console.warn('Модель героини не надета, остаётся манекен:', err.message || err); }
+  }
   hero = a;
   return c;
 }
@@ -507,15 +517,53 @@ function ualClip(role, key) {
   return { idle: ANIM.Zombie_Idle_Loop, run: ANIM.Zombie_Run_Fwd_Loop, death: CLIP.death1, attack: ANIM.Sword_GroundPound }[key] || null;
 }
 
+// Анимации «с перемещением» превращаем в бег на месте: убираем равномерный снос костей за клип
+function inPlace(clip) {
+  for (const t of clip.tracks) {
+    if (!t.name.endsWith('.position') || t.times.length < 3) continue;
+    const v = t.values, n = t.times.length, T = t.times[n - 1] - t.times[0] || 1;
+    let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], v[i * 3 + k]); hi[k] = Math.max(hi[k], v[i * 3 + k]); }
+    const span = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1;
+    for (let k = 0; k < 3; k++) {
+      const drift = v[(n - 1) * 3 + k] - v[k];
+      if (Math.abs(drift) < span * 0.5) continue;      // это не снос, а обычное покачивание
+      for (let i = 0; i < n; i++) v[i * 3 + k] -= drift * (t.times[i] - t.times[0]) / T;
+    }
+  }
+}
 async function makeFamily(loader, role, e) {
   if (!safeFile(e.file)) throw new Error('файл должен лежать в assets/custom');
   const gltf = await loader.loadAsync(CUSTOM + e.file);
   const src = gltf.scene, meshes = [];
+  src.updateMatrixWorld(true);
+  // жёсткие детали на костях (оружие в руке, шлем) превращаем в части со скелетом, чтобы они жили на общих «куклах»
+  let main = null; const rigid = [];
+  src.traverse(o => { if (o.isSkinnedMesh && !main) main = o; });
+  if (main) src.traverse(o => {
+    if (!o.isMesh || o.isSkinnedMesh) return;
+    let b = o.parent; while (b && main.skeleton.bones.indexOf(b) < 0) b = b.parent;
+    if (b) rigid.push([o, main.skeleton.bones.indexOf(b)]);
+  });
+  for (const [o, bi] of rigid) {
+    const bone = main.skeleton.bones[bi], g = o.geometry.clone(), n = g.attributes.position.count;
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(bone.matrixWorld, main.skeleton.boneInverses[bi]).invert().multiply(o.matrixWorld));
+    const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) { si[i * 4] = bi; sw[i * 4] = 1; }
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+    const sm = new THREE.SkinnedMesh(g, o.material);
+    sm.name = o.name; sm.position.copy(main.position); sm.quaternion.copy(main.quaternion); sm.scale.copy(main.scale);
+    main.parent.add(sm); sm.bind(main.skeleton, main.bindMatrix); o.parent.remove(o);
+  }
   src.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   if (!meshes.length) throw new Error('в файле нет сетки со скелетом');
   src.updateMatrixWorld(true);
-  const bb = new THREE.Box3().setFromObject(src), h = bb.max.y - bb.min.y;
+  // габариты считаем по сетке в позе скелета: у моделей из Blender/Mixamo узлы часто масштабированы в 100 раз
+  const bb = new THREE.Box3();
+  for (const m of meshes) { m.computeBoundingBox(); bb.union(m.boundingBox.clone().applyMatrix4(m.matrixWorld)); }
+  const h = bb.max.y - bb.min.y;
   const ual = isUal(src), names = e.clips || {};
+  for (const c of gltf.animations) inPlace(c);
   const clip = key => (names[key] && gltf.animations.find(c => c.name === names[key])) || (ual ? ualClip(role, key) : null);
   if (!clip('walk') && !clip('run') && !clip('idle')) throw new Error(`нет анимаций: укажите clips (в файле есть: ${gltf.animations.map(c => c.name).join(', ') || 'ничего'}) или используйте скелет UAL`);
   return { role, src, meshes, k: (h > 0 ? (e.height || 1.8) / h : 1) * (e.scale || 1), y0: -bb.min.y, rot: (e.rotateY ?? 180) * PI / 180, clip, ual, gun: e.gun !== false && ual, live: null, deaths: [], dead: null };
@@ -607,6 +655,15 @@ async function loadCustom(loader) {
   for (const role of Object.keys(man)) {
     const e = man[role];
     if (role === 'props' || !e || typeof e !== 'object') continue;
+    if (role === 'heroSkin') {
+      try {
+        if (!safeFile(e.file)) throw new Error('файл должен лежать в assets/custom');
+        const g = await loader.loadAsync(CUSTOM + e.file);
+        HERO_SKIN = { scene: g.scene, hide: Array.isArray(e.hide) ? e.hide.filter(x => typeof x === 'string') : [], scale: +e.scale || 1 };
+        console.info(`Модель героини подключена: ${e.file}`);
+      } catch (err) { console.warn('Модель героини не подключена, остаётся манекен:', err.message || err); }
+      continue;
+    }
     if (role !== 'hero' && !KIND[role] && !BOSS_LOOK[role]) { console.warn(`manifest.json: неизвестная роль «${role}»`); continue; }
     try { FAM[role] = await makeFamily(loader, role, e); console.info(`Своя модель подключена: ${role} ← ${e.file}`); }
     catch (err) { console.warn(`Модель «${role}» не подключена, остаётся манекен:`, err.message || err); }

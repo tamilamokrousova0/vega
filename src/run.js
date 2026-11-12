@@ -76,7 +76,7 @@ function loot() {
   else if (x < 0.70) { G.sqDmg += 0.2; toast('Отряд: урон +20%', 'good'); }
   else if (x < 0.82 && h.armor < h.maxArmor - 10) { h.armor = Math.min(h.maxArmor, h.armor + 30); toast('Броня +30', 'good'); }
   else if (x < 0.92) { chargeUlt(35); toast('Заряд ульты +35%', 'good'); }
-  else if (G.weaponTier < WEAPONS.length - 1 && x > 0.96 && G.run.time - (G.run.lastGun || -99) > 90) { G.run.lastGun = G.run.time; upgradeWeapon(); }
+  else if (G.weaponTier < WEAPONS.length - 1 && x > 0.93 && G.run.time - (G.run.lastGun || -99) > 45) { G.run.lastGun = G.run.time; upgradeWeapon(); }
   else { G.sqDmg += 0.2; toast('Отряд: урон +20%', 'good'); }
   sfx.gateGood();
 }
@@ -129,9 +129,12 @@ function startSegment() {
   const afford = 0.42 * squadPower() * r.adapt * def.k / (24 * G.hpMul());
   r.rate = Math.max(1.5 * def.k, Math.min(budget / r.dur, 24 * def.k, afford)); r.spawnT = 1.2;
   r.hpK = threatHp(r.rate, def.k);
+  G.narrow = !!def.sides;
+  // оружейный ящик: в середине первой и третьей волны каждого биома
+  if (r.segIdx === 2 && r.wave !== 1) r.gunT = 6;
   r.gateT = def.crate ? 2.5 : 1e9; r.wallT = def.wall ? rand(5, 9) : 1e9; r.sideT = def.sides ? 2.5 : 1e9;
   r.cages = def.cages || 0; r.cageT = 2.5; r.supplyT = def.supply ? 2 : 1e9;
-  const tag = { barricade: 'Держать оборону', ambush: 'Засада', panic: 'Паника: бегуны', rescue: 'Спасите пленных', narrow: 'Узкое место', supply: 'Снабжение', gates: 'Склад: ящики со снаряжением' }[type];
+  const tag = { barricade: 'Держать оборону', ambush: 'Засада', panic: 'Паника: бегуны', rescue: 'Спасите пленных', narrow: 'Узкое место: держитесь центра', supply: 'Снабжение', gates: 'Склад: ящики со снаряжением' }[type];
   if (tag) toast(tag, def.heavy ? 'bad' : 'good');
 }
 
@@ -152,7 +155,8 @@ function spawnOne(def, rateK) {
   const r = G.run, type = pickType(def), ed = ENEMIES[type];
   r.spawnT += ed.cost / (r.rate * rateK);
   const far = Math.min(worldInfo.b ? worldInfo.b.far * 0.95 : 100, 105);
-  spawnEnemy(type, rand(-4.9, 4.9), -(far + rand(2, 24)), { hpK: r.hpK });
+  const half = def.sides ? 1.9 : 4.9;          // в узком месте враги идут по коридору
+  spawnEnemy(type, rand(-half, half), -(far + rand(2, 24)), { hpK: r.hpK });
 }
 
 function updateSegment(dt) {
@@ -166,7 +170,8 @@ function updateSegment(dt) {
   if (moving) {
     if ((r.gateT -= dt) <= 0) { r.gateT = def.crate * rand(0.8, 1.25); spawnCrate(rand(-4, 4), -66); }
     if ((r.wallT -= dt) <= 0) { r.wallT = def.wall * rand(0.8, 1.3); spawnBarricade(rand(-3.4, 3.4), -70); }
-    if ((r.sideT -= dt) <= 0) { r.sideT = def.sides; spawnBarricade(-3.7, -72); spawnBarricade(3.7, -72); }
+    if ((r.sideT -= dt) <= 0) { r.sideT = def.sides; spawnBarricade(-3.8, -72); spawnBarricade(3.8, -72); }
+    if (r.gunT > 0 && (r.gunT -= dt) <= 0) { spawnCrate(clamp(G.hero.x + rand(-1, 1), -1.6, 1.6), -66, 'weapon'); toast('Оружейный ящик впереди — расстреляйте его', 'good'); }
     if ((r.barrelT -= dt) <= 0) { r.barrelT = rand(6, 11); spawnBarrel(rand(-4.3, 4.3), -66); }
     if (r.cages > 0 && (r.cageT -= dt) <= 0) { r.cages--; r.cageT = 8; spawnCage((Math.random() < 0.5 ? -1 : 1) * 4.2, -68); }
     if ((r.supplyT -= dt) <= 0) {
@@ -185,7 +190,7 @@ function updateSegment(dt) {
 
 function startMini() {
   const r = G.run;
-  r.phase = 'mini'; r.t = 0; r.def = SEGMENTS.avenue; r.type = 'mini';
+  G.narrow = false; r.phase = 'mini'; r.t = 0; r.def = SEGMENTS.avenue; r.type = 'mini';
   r.rate = THREAT * 40 * Math.pow(1 + 0.09 * r.seg, 1.4) * Math.pow(1.35, r.cycle - 1) * 0.3 / SEG_DUR; r.spawnT = 2;
   r.hpK = threatHp(r.rate, 0.6);
   const e = spawnEnemy('brute', 0, -(Math.min(worldInfo.b ? worldInfo.b.far * 0.95 : 100, 105) + 6), { hpK: Math.max((1 + 0.35 * r.wave) * Math.pow(1.35, r.cycle - 1), squadPower() * 9 / (1500 * G.hpMul())) });
@@ -195,7 +200,7 @@ function startMini() {
 
 export function startBoss() {
   const r = G.run;
-  r.phase = 'boss'; r.bossLoss = false; r.type = 'boss';
+  G.narrow = false; r.phase = 'boss'; r.bossLoss = false; r.type = 'boss';
   G.mode = 'boss';
   // бой с боссом рассчитан примерно на 40 с огня всем отрядом, но не короче базового здоровья
   G.bossHpMin = squadPower() * 14;

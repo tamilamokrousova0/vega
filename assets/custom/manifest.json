@@ -1,1 +1,7 @@
-{}
+{
+  "heroSkin": { "file": "vega.glb", "hide": ["Wapon"] },
+  "soldier": { "file": "soldier.glb", "height": 1.8, "clips": { "run": "Rifle_run", "idle": "Rifle_stand" } },
+  "walker":  { "file": "zombie_hazmat.glb", "height": 1.8, "clips": { "walk": "Zombie_Walk_Root", "idle": "Zombie_Idle" } },
+  "spitter": { "file": "zombie_hazmat.glb", "height": 1.8, "clips": { "walk": "Zombie_Walk_Root", "idle": "Zombie_Idle" } },
+  "fat":     { "file": "mutant.glb", "height": 1.25, "clips": { "walk": "Walk_InPlace", "run": "Run_InPlace", "idle": "Armature|Armature|Armature|Armature|IdleComplete" } }
+}

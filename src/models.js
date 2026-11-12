@@ -77,6 +77,8 @@ export const MAT = {
   gun: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.55 }),
   prop: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }),
   steel: new THREE.MeshStandardMaterial({ color: 0x2a2d30, roughness: 0.55, metalness: 0.6 }),
+  wood: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 }),
+  drum: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.45 }),
   glowO: new THREE.MeshBasicMaterial({ color: 0xff7a22 }),
   glowG: new THREE.MeshBasicMaterial({ color: 0x86e05a }),
   glowR: new THREE.MeshBasicMaterial({ color: 0xff2618 }),

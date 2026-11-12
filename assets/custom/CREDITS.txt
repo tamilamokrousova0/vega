@@ -1,0 +1,12 @@
+Модели с Sketchfab, лицензия CC Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Изменения: текстуры уменьшены и пересжаты в JPEG, убраны неиспользуемые анимации (tools/shrink_glb.py).
+
+soldier.glb       — "Futuristic soldier (lowpoly)", автор slagperch3d
+                    https://sketchfab.com/3d-models/5ebade1ccbff4adb91ddd3a4d1fcd541
+zombie_hazmat.glb — "Zombie Hazmat", автор LxNazarov
+                    https://sketchfab.com/3d-models/49b3b4307f6a4d2386fdb02354158d04
+mutant.glb        — "Three-Head Baby Mutant", автор LxNazarov
+                    https://sketchfab.com/3d-models/a769a92a263d47488b8fb2136c2759fb
+vega.glb          — "Cyberpunk Assassin Girl Free Rigged", автор Ilya.Anchouz.Danilov
+                    https://sketchfab.com/3d-models/b7201c11c0ba494ca4ef158884ce4a05
+                    (материал переведён в стандартный PBR; анимации берутся со скелета-манекена, см. src/skin.js)

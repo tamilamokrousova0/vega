@@ -6,9 +6,10 @@ import { P, box, cyl, sph, cone, ico, merge, MAT } from './models.js';
 import { fire, steam, sparks, emitGlow, emitSolid } from './fx.js';
 import { setAmbient } from './ambient.js';
 import { customProps } from './actors.js';
+import { TEX, detail, tintFor } from './textures.js';
 
 const PI = Math.PI, LIGHT = new THREE.Color(0xc8d0d8);
-const W = { props: [], live: [], road: null, ground: null, sun: null, hemi: null, dust: null, dustVel: null, biome: null, sky: null, disc: null, halo: null, back: null, fireLights: [], flash: 0, b: null, wind: 0, fogK: 1, fogKT: 1, tint: 0, tintT: 0 };
+const W = { gmaps: {}, gtile: 10, props: [], live: [], road: null, ground: null, sun: null, hemi: null, dust: null, dustVel: null, biome: null, sky: null, disc: null, halo: null, back: null, fireLights: [], flash: 0, b: null, wind: 0, fogK: 1, fogKT: 1, tint: 0, tintT: 0 };
 
 const BIOMES = {
   city:   { fog: 0x161c26, zenith: 0x05070c, near: 26, far: 115, ground: 0x34373c, road: 0xa8a8aa, sun: 0xa9bbdc, sunI: 3.2, sky: 0x55647e, gnd: 0x2a2c34, hemiI: 2.5,
@@ -99,6 +100,25 @@ function haloTex() {
   g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.25, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
   return new THREE.CanvasTexture(c);
+}
+
+// биом → [текстура земли, размер плитки (м), насколько сохранять собственный цвет текстуры]
+const GROUND_TEX = { city: ['pavement', 5, 0.6], desert: ['sand', 4, 0.35], forest: ['forest', 4, 0.35], snow: ['snow', 5, 0.5], factory: ['floor', 5, 0.6], neon: ['pavement', 5, 0.7], lab: ['floor', 4, 0.6] };
+// ---------- Текстуры объектов ----------
+// вид объекта → [текстура, размер плитки (м), доля цвета текстуры, рельеф, блеск металла]
+const C = ['concrete', 4, 0.35, 0.008, 0], ME = ['metal', 2.2, 0.15, 0.008, 0.45], RU = ['rust', 2.5, 0.45, 0.012, 0.35], RO = ['rock', 5, 0.4, 0.035, 0],
+  BA = ['bark', 1.6, 0.35, 0.03, 0], PL = ['planks', 2, 0.45, 0.015, 0], IR = ['iron', 2.5, 0.3, 0.02, 0.4];
+const PROP_TEX = { building: C, neontower: ['concrete', 5, 0.15, 0.01, 0], shop: ['brick', 2.4, 0.5, 0.02, 0], bunker: C, pillar: C, arch: C, station: C, rubble: C,
+  car: ME, bus: ME, truck: ME, lamp: ME, pole: PL, gantry: ME, billboard: ME, sign: ME, mast: ME, radar: ME, rack: ME, tower: IR, hangar: IR, fence: IR,
+  pipe: RU, fan: RU, press: RU, tank: RU, pumpjack: RU, rock: RO, mesa: ['rock', 9, 0.3, 0.04, 0], bones: RO,
+  tree: BA, conifer: BA, deadtree: BA, pine: BA, log: BA, bush: BA, cactus: ['bark', 1.2, 0.1, 0.02, 0], shroom: ['leather', 0.8, 0.1, 0.02, 0],
+  cabin: PL, crates: PL, clutter: PL, hive: ['leather', 1.4, 0.2, 0.03, 0], pod: ['leather', 1.2, 0.2, 0.02, 0] };
+const propMats = {};
+function propMat(kind) {
+  if (propMats[kind]) return propMats[kind];
+  const t = PROP_TEX[kind] || C, m = MAT.prop.clone();
+  if (t[4]) { m.metalness = t[4]; m.roughness = 0.62; }
+  return propMats[kind] = detail(m, t[0], t[1], { own: t[2], bump: t[3] });
 }
 
 // ---------- Материалы подвижных частей ----------
@@ -448,8 +468,8 @@ function buildProps(list) {
     const variants = [];
     for (let v = 0; v < Math.min(4, count); v++) {
       const def = PROP[kind]();
-      let mat = MAT.prop;
-      if (def.glow) { mat = MAT.prop.clone(); mat.emissive = new THREE.Color(0x1a6a48); mat.emissiveIntensity = def.glow; mat.userData.own = true; mat.userData.glow = def.glow; }
+      let mat = propMat(kind);
+      if (def.glow) { const t = PROP_TEX[kind] || C; mat = detail(MAT.prop.clone(), t[0], t[1], { own: t[2], bump: t[3] }); mat.emissive = new THREE.Color(0x1a6a48); mat.emissiveIntensity = def.glow; mat.userData.own = true; mat.userData.glow = def.glow; }
       const kids = (def.kids || []).map(k => ({ k, geo: merge(k.parts, 0.05) }));
       variants.push({ def, geo: merge(def.parts, def.grit || 0.08), mat, kids });
     }
@@ -462,7 +482,7 @@ function buildProps(list) {
       if (v.kids.length) {
         m = new THREE.Group(); m.add(body);
         for (const kd of v.kids) {
-          const km = new THREE.Mesh(kd.geo, kd.k.mat ? KM[kd.k.mat] : MAT.prop);
+          const km = new THREE.Mesh(kd.geo, kd.k.mat ? KM[kd.k.mat] : v.mat);
           km.position.set(...kd.k.pos); km.userData.own = own;
           if (!kd.k.mat) km.castShadow = true;
           m.add(km); u.kids.push({ m: km, k: kd.k, ph: R() * 6.28 });
@@ -554,7 +574,8 @@ export function initWorld(canvas) {
   W.road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_HALF * 2 + 0.6, 250), new THREE.MeshStandardMaterial({ map: roadTex(), roughness: 0.92 }));
   W.road.rotation.x = -PI / 2; W.road.position.set(0, 0, -100); W.road.receiveShadow = true; scene.add(W.road);
   const cg = merge([P(box(0.3, 0.16, 250), 0x8a8a88, [-ROAD_HALF - 0.45, 0.05, -100]), P(box(0.3, 0.16, 250), 0x8a8a88, [ROAD_HALF + 0.45, 0.05, -100])]);
-  W.curb = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 })); W.curb.receiveShadow = true; scene.add(W.curb);
+  detail(W.road.material, 'asphalt', 3.5, { own: 0, amt: 0.85, bump: 0.01, rough: 0.12 });
+  W.curb = new THREE.Mesh(cg, detail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), 'concrete', 3, { own: 0.2, bump: 0.02 })); W.curb.receiveShadow = true; scene.add(W.curb);
 
   for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xff7a30, 0, 20, 1.7); l.position.set(0, -50, 0); scene.add(l); W.fireLights.push(l); }
 
@@ -583,7 +604,14 @@ export function setBiome(key) {
   const b = W.b = Object.assign({}, src, { fog: lift(src.fog, 0.2), zenith: lift(src.zenith, 0.12), ground: lift(src.ground, 0.18), sky: lift(src.sky, 0.25), gnd: lift(src.gnd, 0.25),
     sunI: src.sunI * 1.3, hemiI: src.hemiI * 1.7, near: src.near * 1.5, far: src.far * 1.25 });
   s.fog.color.set(b.fog); s.fog.near = b.near; s.fog.far = b.far; s.background.set(b.fog);
-  W.ground.material.color.set(b.ground); W.road.material.color.set(b.road); W.curb.material.color.set(b.road);
+  // земля: своя фото-текстура на каждый биом; дорога и бордюр — рисунок асфальта и бетона поверх разметки
+  const gt = GROUND_TEX[key] || GROUND_TEX.city, gm = W.ground.material;
+  if (TEX[gt[0]]) {
+    if (!W.gmaps[gt[0]]) { const t = W.gmaps[gt[0]] = TEX[gt[0]].clone(); t.repeat.set(300 / gt[1], 300 / gt[1]); t.anisotropy = 8; t.needsUpdate = true; }
+    const keepY = gm.map ? gm.map.offset.y : 0; gm.map = W.gmaps[gt[0]]; gm.map.offset.y = keepY % 1; W.gtile = gt[1];
+    gm.color.copy(tintFor(gt[0], b.ground, gt[2])).multiplyScalar(0.42); gm.needsUpdate = true;
+  } else gm.color.set(b.ground);
+  W.road.material.color.set(b.road); W.curb.material.color.set(b.road);
   W.sun.color.set(b.sun); W.sun.intensity = b.sunI;
   W.hemi.color.set(b.sky); W.hemi.groundColor.set(b.gnd); W.hemi.intensity = b.hemiI;
   W.dust.material.color.set(b.dust); W.dustDir = b.dustDir;
@@ -612,7 +640,11 @@ const _fc = new THREE.Color(), WHITE = new THREE.Color(0xbfd0ff), RED = new THRE
 export function updateWorld(dt) {
   const d = G.scroll * dt, t = G.time, b = W.b;
   W.road.material.map.offset.y += d / (250 / 24);
-  W.ground.material.map.offset.y += d / 10;
+  W.ground.material.map.offset.y += d / W.gtile;
+  // рисунок асфальта и бетона едет вместе с дорогой
+  const ro = W.road.material.userData.tri, co = W.curb.material.userData.tri;
+  if (ro) ro.uOff.value.y = (ro.uOff.value.y + d) % 3000;
+  if (co) co.uOff.value.z = (co.uOff.value.z - d) % 3000;
   for (const m of W.props) {
     m.position.z += d;
     const u = m.userData;
